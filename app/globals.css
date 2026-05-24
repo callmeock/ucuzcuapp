@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --migros: #f97316;
+  --a101: #dc2626;
+  --bim: #2563eb;
+  --sok: #7c3aed;
+  --primary: #e63946;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f4f6fa;
+}
+
+/* Scrollbar gizle (category bar için) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
