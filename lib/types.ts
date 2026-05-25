@@ -5,9 +5,16 @@ export interface PriceHistory {
   price: number
 }
 
+export type CampaignType = 'discount' | 'cashback'
+
 export interface Campaign {
-  name: string        // "Migros Money", "Win Para Kazan", "Axess İndirim" vb.
-  campaignPrice: number
+  type: CampaignType
+  name: string            // "MoneyClub", "Win Para", "Axess" vb.
+  // discount: kart sahibine özel düşük fiyat
+  campaignPrice?: number
+  // cashback: kazanılan tutar (₺) veya puan
+  cashbackAmount?: number
+  cashbackUnit?: string   // "₺" | "Win Para" | "puan"
 }
 
 export interface MarketPrice {
@@ -17,7 +24,7 @@ export interface MarketPrice {
   available: boolean
   updatedAt: string
   history: PriceHistory[]
-  campaign?: Campaign | null   // varsa kampanya fiyatı
+  campaign?: Campaign | null
 }
 
 export interface Product {

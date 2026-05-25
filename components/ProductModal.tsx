@@ -102,7 +102,9 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
 
   const available = product.prices.filter((p) => p.available)
   const effectivePrice = (p: typeof available[0]) =>
-    p.campaign ? p.campaign.campaignPrice : p.currentPrice
+    p.campaign?.type === 'discount' && p.campaign.campaignPrice != null
+      ? p.campaign.campaignPrice
+      : p.currentPrice
   const prices = available.map(effectivePrice)
   const minPrice = Math.min(...prices)
   const maxPrice = Math.max(...prices)
@@ -159,36 +161,48 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
               const effPrice = effectivePrice(pr)
               const isCheapest = pr.available && effPrice === minPrice && available.length > 1
               const color = MARKET_COLORS[pr.market]
-              const hasCampaign = pr.available && !!pr.campaign
+              const campaign = pr.available ? pr.campaign : null
+              const isDiscount = campaign?.type === 'discount'
+              const isCashback = campaign?.type === 'cashback'
+
               return (
                 <div
                   key={pr.market}
                   className={`rounded-xl p-3.5 border-2 transition-all ${
-                    isCheapest ? 'border-green-300 bg-green-50' : hasCampaign ? 'border-orange-200 bg-orange-50' : 'border-transparent bg-gray-50'
+                    isCheapest ? 'border-green-300 bg-green-50'
+                    : isDiscount ? 'border-purple-200 bg-purple-50'
+                    : isCashback ? 'border-amber-200 bg-amber-50'
+                    : 'border-transparent bg-gray-50'
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-bold text-gray-800 mb-1 text-sm flex-wrap">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                     {pr.market}
                     {isCheapest && (
-                      <span className="text-xs bg-green-600 text-white px-1 py-0.5 rounded font-bold">
-                        EN UCUZ
-                      </span>
+                      <span className="text-xs bg-green-600 text-white px-1 py-0.5 rounded font-bold">EN UCUZ</span>
+                    )}
+                    {isDiscount && (
+                      <span className="text-xs bg-purple-600 text-white px-1 py-0.5 rounded font-bold">💳 {campaign.name}</span>
                     )}
                   </div>
+
                   {pr.available ? (
                     <>
-                      {hasCampaign && (
+                      {isDiscount && (
                         <div className="text-xs text-gray-400 line-through leading-none mb-0.5">
                           {pr.currentPrice.toFixed(2)} ₺
                         </div>
                       )}
-                      <div className={`text-2xl font-extrabold ${isCheapest ? 'text-green-600' : hasCampaign ? 'text-orange-600' : 'text-gray-900'}`}>
+                      <div className={`text-2xl font-extrabold ${
+                        isCheapest ? 'text-green-600'
+                        : isDiscount ? 'text-purple-600'
+                        : 'text-gray-900'
+                      }`}>
                         {effPrice.toFixed(2)} ₺
                       </div>
-                      {hasCampaign && (
-                        <div className="text-xs font-bold text-orange-500 mt-0.5">
-                          🏷️ {pr.campaign!.name}
+                      {isCashback && campaign.cashbackAmount != null && (
+                        <div className="text-xs font-bold text-amber-600 mt-1">
+                          🎁 +{campaign.cashbackAmount} {campaign.cashbackUnit ?? 'puan'} kazan
                         </div>
                       )}
                       <div className="text-xs text-gray-400 mt-0.5">{pr.updatedAt}</div>

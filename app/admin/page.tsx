@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getProducts, addProduct, updateProduct, deleteProduct } from '@/lib/db'
-import { Product, CATEGORIES, MARKET_COLORS, CATEGORY_CONFIG } from '@/lib/types'
+import { Product, CATEGORIES, MARKET_COLORS, CATEGORY_CONFIG, type CampaignType } from '@/lib/types'
 import { uploadBrosur, getAllBrosurler, deleteBrosur, type Brosur } from '@/lib/brosurler'
 import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
@@ -17,8 +17,11 @@ const emptyForm = {
 }
 const emptyPrices: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
 const emptyAvail: Record<MarketName, boolean> = { Migros: true, A101: true, 'BİM': true, 'Şok': true }
+const emptyCampaignType: Record<MarketName, CampaignType> = { Migros: 'discount', A101: 'discount', 'BİM': 'discount', 'Şok': 'cashback' }
 const emptyCampaignName: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
 const emptyCampaignPrice: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
+const emptyCampaignCashback: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
+const emptyCampaignCashbackUnit: Record<MarketName, string> = { Migros: '₺', A101: '₺', 'BİM': '₺', 'Şok': 'Win Para' }
 
 export default function AdminPage() {
   const { user, loading: authLoading, signInWithGoogle } = useAuth()
@@ -74,8 +77,11 @@ function AdminPanel() {
   const [form, setForm] = useState(emptyForm)
   const [marketPrices, setMarketPrices] = useState<Record<MarketName, string>>(emptyPrices)
   const [marketAvail, setMarketAvail] = useState<Record<MarketName, boolean>>(emptyAvail)
+  const [campaignType, setCampaignType] = useState<Record<MarketName, CampaignType>>(emptyCampaignType)
   const [campaignName, setCampaignName] = useState<Record<MarketName, string>>(emptyCampaignName)
   const [campaignPrice, setCampaignPrice] = useState<Record<MarketName, string>>(emptyCampaignPrice)
+  const [campaignCashback, setCampaignCashback] = useState<Record<MarketName, string>>(emptyCampaignCashback)
+  const [campaignCashbackUnit, setCampaignCashbackUnit] = useState<Record<MarketName, string>>(emptyCampaignCashbackUnit)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [search, setSearch] = useState('')
 
@@ -161,7 +167,9 @@ function AdminPanel() {
       avail[pr.market as MarketName] = pr.available
       if (pr.campaign) {
         cName[pr.market as MarketName] = pr.campaign.name
-        cPrice[pr.market as MarketName] = pr.campaign.campaignPrice.toString()
+        if (pr.campaign.type === 'discount' && pr.campaign.campaignPrice != null) {
+          cPrice[pr.market as MarketName] = pr.campaign.campaignPrice.toString()
+        }
       }
     })
     setMarketPrices(prices)
@@ -176,8 +184,11 @@ function AdminPanel() {
     setForm(emptyForm)
     setMarketPrices(emptyPrices)
     setMarketAvail(emptyAvail)
+    setCampaignType(emptyCampaignType)
     setCampaignName(emptyCampaignName)
     setCampaignPrice(emptyCampaignPrice)
+    setCampaignCashback(emptyCampaignCashback)
+    setCampaignCashbackUnit(emptyCampaignCashbackUnit)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -214,7 +225,12 @@ function AdminPanel() {
                 ? [...oldEntry.history, { date: today, price: newPrice }]
                 : oldEntry.history
               : [{ date: today, price: newPrice }]
-            const hasCampaign = campaignName[m] && campaignPrice[m] && !isNaN(parseFloat(campaignPrice[m]))
+            const hasCampaignName = !!campaignName[m]
+            const campaign = hasCampaignName
+              ? campaignType[m] === 'discount'
+                ? { type: 'discount' as const, name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) || undefined }
+                : { type: 'cashback' as const, name: campaignName[m], cashbackAmount: parseFloat(campaignCashback[m]) || undefined, cashbackUnit: campaignCashbackUnit[m] || undefined }
+              : null
             return {
               market: m,
               currentPrice: newPrice,
@@ -222,9 +238,7 @@ function AdminPanel() {
               available: marketAvail[m],
               updatedAt: today,
               history,
-              campaign: hasCampaign
-                ? { name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) }
-                : null,
+              campaign,
             }
           })
 
@@ -242,7 +256,12 @@ function AdminPanel() {
       } else {
         // ── YENİ ÜRÜN ──
         const prices = enteredMarkets.map((m) => {
-          const hasCampaign = campaignName[m] && campaignPrice[m] && !isNaN(parseFloat(campaignPrice[m]))
+          const hasCampaignName = !!campaignName[m]
+          const campaign = hasCampaignName
+            ? campaignType[m] === 'discount'
+              ? { type: 'discount' as const, name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) || undefined }
+              : { type: 'cashback' as const, name: campaignName[m], cashbackAmount: parseFloat(campaignCashback[m]) || undefined, cashbackUnit: campaignCashbackUnit[m] || undefined }
+            : null
           return {
             market: m,
             currentPrice: parseFloat(marketPrices[m]),
@@ -250,9 +269,7 @@ function AdminPanel() {
             available: marketAvail[m],
             updatedAt: today,
             history: [{ date: today, price: parseFloat(marketPrices[m]) }],
-            campaign: hasCampaign
-              ? { name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) }
-              : null,
+            campaign,
           }
         })
         await addProduct({
@@ -585,21 +602,64 @@ function AdminPanel() {
                     </div>
                     {/* Kampanya satırı — sadece fiyat girilmişse göster */}
                     {marketPrices[m] && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border-t border-orange-100">
-                        <span className="text-xs text-orange-500 shrink-0">🏷️</span>
+                      <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 space-y-1.5">
+                        {/* Tip seçici */}
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCampaignType({ ...campaignType, [m]: 'discount' })}
+                            className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${campaignType[m] === 'discount' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}`}
+                          >
+                            💳 İndirim
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCampaignType({ ...campaignType, [m]: 'cashback' })}
+                            className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${campaignType[m] === 'cashback' ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-500'}`}
+                          >
+                            🎁 Cashback
+                          </button>
+                          {campaignName[m] && (
+                            <button
+                              type="button"
+                              onClick={() => { setCampaignName({ ...campaignName, [m]: '' }); setCampaignPrice({ ...campaignPrice, [m]: '' }); setCampaignCashback({ ...campaignCashback, [m]: '' }) }}
+                              className="text-xs text-gray-400 hover:text-red-500 ml-auto"
+                            >✕ Kaldır</button>
+                          )}
+                        </div>
+                        {/* Kampanya adı */}
                         <input
-                          className="flex-1 text-xs outline-none bg-transparent placeholder-orange-300"
-                          placeholder="Kampanya adı (Migros Money, Win Para...)"
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-300 bg-white"
+                          placeholder={campaignType[m] === 'discount' ? 'Kart adı (MoneyClub, Axess...)' : 'Kampanya adı (Win Para, Maxi Puan...)'}
                           value={campaignName[m]}
                           onChange={(e) => setCampaignName({ ...campaignName, [m]: e.target.value })}
                         />
-                        <input
-                          type="number" step="0.01" min="0"
-                          className="w-20 text-xs outline-none bg-transparent text-right placeholder-orange-300"
-                          placeholder="kampanya ₺"
-                          value={campaignPrice[m]}
-                          onChange={(e) => setCampaignPrice({ ...campaignPrice, [m]: e.target.value })}
-                        />
+                        {/* Tipe göre ek alan */}
+                        {campaignType[m] === 'discount' ? (
+                          <input
+                            type="number" step="0.01" min="0"
+                            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-purple-300 bg-white"
+                            placeholder="Kart sahibi fiyatı (₺)"
+                            value={campaignPrice[m]}
+                            onChange={(e) => setCampaignPrice({ ...campaignPrice, [m]: e.target.value })}
+                          />
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <input
+                              type="number" step="1" min="0"
+                              className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-amber-300 bg-white"
+                              placeholder="Kazanılan miktar"
+                              value={campaignCashback[m]}
+                              onChange={(e) => setCampaignCashback({ ...campaignCashback, [m]: e.target.value })}
+                            />
+                            <input
+                              className="w-24 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-amber-300 bg-white"
+                              placeholder="Birim"
+                              value={campaignCashbackUnit[m]}
+                              onChange={(e) => setCampaignCashbackUnit({ ...campaignCashbackUnit, [m]: e.target.value })}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
