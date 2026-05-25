@@ -4,6 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { getProducts, addProduct, updateProduct, deleteProduct } from '@/lib/db'
 import { Product, CATEGORIES, MARKET_COLORS, CATEGORY_CONFIG } from '@/lib/types'
 import { uploadBrosur, getAllBrosurler, deleteBrosur, type Brosur } from '@/lib/brosurler'
+import { useAuth } from '@/lib/auth'
+import Link from 'next/link'
+
+const ADMIN_EMAIL = 'eonurcankilic@gmail.com'
 
 type MarketName = 'Migros' | 'A101' | 'BİM' | 'Şok'
 const MARKETS: MarketName[] = ['Migros', 'A101', 'BİM', 'Şok']
@@ -15,6 +19,49 @@ const emptyPrices: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': 
 const emptyAvail: Record<MarketName, boolean> = { Migros: true, A101: true, 'BİM': true, 'Şok': true }
 
 export default function AdminPage() {
+  const { user, loading: authLoading, signInWithGoogle } = useAuth()
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-gray-800 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user || user.email !== ADMIN_EMAIL) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-sm w-full text-center">
+          <div className="text-5xl mb-4">🔒</div>
+          <h1 className="font-bold text-gray-900 text-xl mb-2">Yetkisiz Erişim</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            Bu sayfaya erişmek için admin hesabıyla giriş yapman gerekiyor.
+          </p>
+          {!user ? (
+            <button
+              onClick={signInWithGoogle}
+              className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-colors"
+            >
+              Google ile Giriş Yap
+            </button>
+          ) : (
+            <p className="text-sm text-red-500 font-semibold">
+              {user.email} bu panele erişemez.
+            </p>
+          )}
+          <Link href="/" className="block mt-4 text-sm text-gray-400 hover:text-gray-600">
+            ← Ana sayfaya dön
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return <AdminPanel />
+}
+
+function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'urunler' | 'brosurler'>('urunler')
 
   // ── Ürün state ──
