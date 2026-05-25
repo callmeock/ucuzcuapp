@@ -101,7 +101,9 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
   const [activeMarket, setActiveMarket] = useState(product.prices[0]?.market)
 
   const available = product.prices.filter((p) => p.available)
-  const prices = available.map((p) => p.currentPrice)
+  const effectivePrice = (p: typeof available[0]) =>
+    p.campaign ? p.campaign.campaignPrice : p.currentPrice
+  const prices = available.map(effectivePrice)
   const minPrice = Math.min(...prices)
   const maxPrice = Math.max(...prices)
   const activePriceData = product.prices.find((p) => p.market === activeMarket)
@@ -154,16 +156,18 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
           {/* Price Cards */}
           <div className="grid grid-cols-2 gap-3">
             {product.prices.map((pr) => {
-              const isCheapest = pr.available && pr.currentPrice === minPrice && available.length > 1
+              const effPrice = effectivePrice(pr)
+              const isCheapest = pr.available && effPrice === minPrice && available.length > 1
               const color = MARKET_COLORS[pr.market]
+              const hasCampaign = pr.available && !!pr.campaign
               return (
                 <div
                   key={pr.market}
                   className={`rounded-xl p-3.5 border-2 transition-all ${
-                    isCheapest ? 'border-green-300 bg-green-50' : 'border-transparent bg-gray-50'
+                    isCheapest ? 'border-green-300 bg-green-50' : hasCampaign ? 'border-orange-200 bg-orange-50' : 'border-transparent bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 font-bold text-gray-800 mb-1 text-sm">
+                  <div className="flex items-center gap-1.5 font-bold text-gray-800 mb-1 text-sm flex-wrap">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                     {pr.market}
                     {isCheapest && (
@@ -174,9 +178,19 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
                   </div>
                   {pr.available ? (
                     <>
-                      <div className={`text-2xl font-extrabold ${isCheapest ? 'text-green-600' : 'text-gray-900'}`}>
-                        {pr.currentPrice.toFixed(2)} ₺
+                      {hasCampaign && (
+                        <div className="text-xs text-gray-400 line-through leading-none mb-0.5">
+                          {pr.currentPrice.toFixed(2)} ₺
+                        </div>
+                      )}
+                      <div className={`text-2xl font-extrabold ${isCheapest ? 'text-green-600' : hasCampaign ? 'text-orange-600' : 'text-gray-900'}`}>
+                        {effPrice.toFixed(2)} ₺
                       </div>
+                      {hasCampaign && (
+                        <div className="text-xs font-bold text-orange-500 mt-0.5">
+                          🏷️ {pr.campaign!.name}
+                        </div>
+                      )}
                       <div className="text-xs text-gray-400 mt-0.5">{pr.updatedAt}</div>
                     </>
                   ) : (

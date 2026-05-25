@@ -9,6 +9,7 @@ import CategoryFilter from '@/components/CategoryFilter'
 import ProductCard from '@/components/ProductCard'
 import ProductModal from '@/components/ProductModal'
 import BasketPanel from '@/components/BasketPanel'
+import { getSavedLocation, requestLocation, clearLocation, type UserLocation } from '@/lib/location'
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -19,6 +20,42 @@ export default function HomePage() {
   const [basket, setBasket] = useState<Record<string, Product>>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
+
+  // ── Lokasyon ──
+  const [location, setLocation] = useState<UserLocation | null>(null)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationDismissed, setLocationDismissed] = useState(false)
+
+  useEffect(() => {
+    // Kayıtlı konum varsa yükle
+    const saved = getSavedLocation()
+    if (saved) setLocation(saved)
+    // Banner'ı daha önce kapattıysa gösterme
+    if (typeof window !== 'undefined' && localStorage.getItem('ucuzcu_loc_dismissed')) {
+      setLocationDismissed(true)
+    }
+  }, [])
+
+  const handleRequestLocation = async () => {
+    setLocationLoading(true)
+    try {
+      const loc = await requestLocation()
+      setLocation(loc)
+    } catch {
+      // izin reddedildi — banner'ı kapat
+      setLocationDismissed(true)
+      localStorage.setItem('ucuzcu_loc_dismissed', '1')
+    } finally {
+      setLocationLoading(false)
+    }
+  }
+
+  const handleDismissLocation = () => {
+    setLocationDismissed(true)
+    localStorage.setItem('ucuzcu_loc_dismissed', '1')
+  }
+
+  const showLocationBanner = !location && !locationDismissed
 
   useEffect(() => {
     getProducts()
@@ -46,7 +83,6 @@ export default function HomePage() {
     })
   }, [products, search, activeCategory])
 
-  // Kategori başına ürün sayısı
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { 'Tümü': products.length }
     products.forEach((p) => {
@@ -76,10 +112,48 @@ export default function HomePage() {
 
       <main className="max-w-6xl mx-auto px-4 pb-8">
 
+        {/* Lokasyon banner — konum yoksa göster */}
+        {showLocationBanner && (
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mt-3 mb-1">
+            <span className="text-xl shrink-0">📍</span>
+            <div className="flex-1">
+              <p className="font-bold text-sm text-blue-800">En yakın marketleri görelim</p>
+              <p className="text-xs text-blue-500">Konumunu paylaşırsan sana özel market sıralaması yapalım</p>
+            </div>
+            <button
+              onClick={handleRequestLocation}
+              disabled={locationLoading}
+              className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 shrink-0"
+            >
+              {locationLoading ? '...' : 'İzin Ver'}
+            </button>
+            <button
+              onClick={handleDismissLocation}
+              className="text-blue-300 hover:text-blue-500 text-lg shrink-0 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Konum göstergesi — konum alındıysa */}
+        {location && (
+          <div className="flex items-center gap-2 mt-3 mb-1 px-1">
+            <span className="text-sm">📍</span>
+            <span className="text-sm text-gray-600 font-semibold">{location.label}</span>
+            <button
+              onClick={() => { clearLocation(); setLocation(null); setLocationDismissed(false); localStorage.removeItem('ucuzcu_loc_dismissed') }}
+              className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+            >
+              Değiştir
+            </button>
+          </div>
+        )}
+
         {/* Broşür bandı */}
         <Link
           href="/brosurler"
-          className="flex items-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl px-4 py-3 mt-3 mb-1 hover:opacity-90 transition-opacity"
+          className="flex items-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl px-4 py-3 mt-2 mb-1 hover:opacity-90 transition-opacity"
         >
           <span className="text-xl">🔥</span>
           <div className="flex-1">
