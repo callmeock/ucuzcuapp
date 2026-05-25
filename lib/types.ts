@@ -5,6 +5,11 @@ export interface PriceHistory {
   price: number
 }
 
+export interface Campaign {
+  name: string        // "Migros Money", "Win Para Kazan", "Axess İndirim" vb.
+  campaignPrice: number
+}
+
 export interface MarketPrice {
   market: MarketName
   currentPrice: number
@@ -12,6 +17,7 @@ export interface MarketPrice {
   available: boolean
   updatedAt: string
   history: PriceHistory[]
+  campaign?: Campaign | null   // varsa kampanya fiyatı
 }
 
 export interface Product {

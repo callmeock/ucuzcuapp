@@ -17,6 +17,8 @@ const emptyForm = {
 }
 const emptyPrices: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
 const emptyAvail: Record<MarketName, boolean> = { Migros: true, A101: true, 'BİM': true, 'Şok': true }
+const emptyCampaignName: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
+const emptyCampaignPrice: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
 
 export default function AdminPage() {
   const { user, loading: authLoading, signInWithGoogle } = useAuth()
@@ -72,6 +74,8 @@ function AdminPanel() {
   const [form, setForm] = useState(emptyForm)
   const [marketPrices, setMarketPrices] = useState<Record<MarketName, string>>(emptyPrices)
   const [marketAvail, setMarketAvail] = useState<Record<MarketName, boolean>>(emptyAvail)
+  const [campaignName, setCampaignName] = useState<Record<MarketName, string>>(emptyCampaignName)
+  const [campaignPrice, setCampaignPrice] = useState<Record<MarketName, string>>(emptyCampaignPrice)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [search, setSearch] = useState('')
 
@@ -150,12 +154,20 @@ function AdminPanel() {
     })
     const prices = { ...emptyPrices }
     const avail = { ...emptyAvail }
+    const cName = { ...emptyCampaignName }
+    const cPrice = { ...emptyCampaignPrice }
     p.prices.forEach((pr) => {
       prices[pr.market as MarketName] = pr.currentPrice.toString()
       avail[pr.market as MarketName] = pr.available
+      if (pr.campaign) {
+        cName[pr.market as MarketName] = pr.campaign.name
+        cPrice[pr.market as MarketName] = pr.campaign.campaignPrice.toString()
+      }
     })
     setMarketPrices(prices)
     setMarketAvail(avail)
+    setCampaignName(cName)
+    setCampaignPrice(cPrice)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -164,6 +176,8 @@ function AdminPanel() {
     setForm(emptyForm)
     setMarketPrices(emptyPrices)
     setMarketAvail(emptyAvail)
+    setCampaignName(emptyCampaignName)
+    setCampaignPrice(emptyCampaignPrice)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,12 +209,12 @@ function AdminPanel() {
           .map((m) => {
             const newPrice = parseFloat(marketPrices[m])
             const oldEntry = existing.prices.find((pr) => pr.market === m)
-            // Fiyat değiştiyse geçmişe ekle
             const history = oldEntry
               ? oldEntry.currentPrice !== newPrice
                 ? [...oldEntry.history, { date: today, price: newPrice }]
                 : oldEntry.history
               : [{ date: today, price: newPrice }]
+            const hasCampaign = campaignName[m] && campaignPrice[m] && !isNaN(parseFloat(campaignPrice[m]))
             return {
               market: m,
               currentPrice: newPrice,
@@ -208,6 +222,9 @@ function AdminPanel() {
               available: marketAvail[m],
               updatedAt: today,
               history,
+              campaign: hasCampaign
+                ? { name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) }
+                : null,
             }
           })
 
@@ -224,14 +241,20 @@ function AdminPanel() {
         cancelEdit()
       } else {
         // ── YENİ ÜRÜN ──
-        const prices = enteredMarkets.map((m) => ({
-          market: m,
-          currentPrice: parseFloat(marketPrices[m]),
-          unit: '₺/adet',
-          available: marketAvail[m],
-          updatedAt: today,
-          history: [{ date: today, price: parseFloat(marketPrices[m]) }],
-        }))
+        const prices = enteredMarkets.map((m) => {
+          const hasCampaign = campaignName[m] && campaignPrice[m] && !isNaN(parseFloat(campaignPrice[m]))
+          return {
+            market: m,
+            currentPrice: parseFloat(marketPrices[m]),
+            unit: '₺/adet',
+            available: marketAvail[m],
+            updatedAt: today,
+            history: [{ date: today, price: parseFloat(marketPrices[m]) }],
+            campaign: hasCampaign
+              ? { name: campaignName[m], campaignPrice: parseFloat(campaignPrice[m]) }
+              : null,
+          }
+        })
         await addProduct({
           name: form.name, brand: form.brand, category: form.category,
           unit: form.unit, barcode: form.barcode || null, image: form.image || null, prices,
@@ -537,27 +560,48 @@ function AdminPanel() {
               </label>
               <div className="space-y-2">
                 {MARKETS.map((m) => (
-                  <div key={m} className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: MARKET_COLORS[m] }} />
-                    <span className="text-sm font-semibold text-gray-700 w-14 shrink-0">{m}</span>
-                    <input
-                      type="number" step="0.01" min="0"
-                      className="flex-1 text-sm outline-none"
-                      placeholder="fiyat yok"
-                      value={marketPrices[m]}
-                      onChange={(e) => setMarketPrices({ ...marketPrices, [m]: e.target.value })}
-                    />
-                    <span className="text-xs text-gray-400 shrink-0">₺</span>
-                    {/* Stok toggle */}
-                    <button
-                      type="button"
-                      onClick={() => setMarketAvail({ ...marketAvail, [m]: !marketAvail[m] })}
-                      className={`text-xs px-2 py-0.5 rounded-full font-semibold shrink-0 transition-colors ${
-                        marketAvail[m] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {marketAvail[m] ? 'Stokta' : 'Yok'}
-                    </button>
+                  <div key={m} className="border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Ana fiyat satırı */}
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: MARKET_COLORS[m] }} />
+                      <span className="text-sm font-semibold text-gray-700 w-14 shrink-0">{m}</span>
+                      <input
+                        type="number" step="0.01" min="0"
+                        className="flex-1 text-sm outline-none"
+                        placeholder="fiyat yok"
+                        value={marketPrices[m]}
+                        onChange={(e) => setMarketPrices({ ...marketPrices, [m]: e.target.value })}
+                      />
+                      <span className="text-xs text-gray-400 shrink-0">₺</span>
+                      <button
+                        type="button"
+                        onClick={() => setMarketAvail({ ...marketAvail, [m]: !marketAvail[m] })}
+                        className={`text-xs px-2 py-0.5 rounded-full font-semibold shrink-0 transition-colors ${
+                          marketAvail[m] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {marketAvail[m] ? 'Stokta' : 'Yok'}
+                      </button>
+                    </div>
+                    {/* Kampanya satırı — sadece fiyat girilmişse göster */}
+                    {marketPrices[m] && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border-t border-orange-100">
+                        <span className="text-xs text-orange-500 shrink-0">🏷️</span>
+                        <input
+                          className="flex-1 text-xs outline-none bg-transparent placeholder-orange-300"
+                          placeholder="Kampanya adı (Migros Money, Win Para...)"
+                          value={campaignName[m]}
+                          onChange={(e) => setCampaignName({ ...campaignName, [m]: e.target.value })}
+                        />
+                        <input
+                          type="number" step="0.01" min="0"
+                          className="w-20 text-xs outline-none bg-transparent text-right placeholder-orange-300"
+                          placeholder="kampanya ₺"
+                          value={campaignPrice[m]}
+                          onChange={(e) => setCampaignPrice({ ...campaignPrice, [m]: e.target.value })}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

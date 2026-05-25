@@ -14,7 +14,11 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
   const available = product.prices.filter((p) => p.available)
   if (available.length === 0) return null
 
-  const prices = available.map((p) => p.currentPrice)
+  // Efektif fiyat: kampanya varsa kampanya fiyatı, yoksa normal fiyat
+  const effectivePrice = (p: typeof available[0]) =>
+    p.campaign ? p.campaign.campaignPrice : p.currentPrice
+
+  const prices = available.map(effectivePrice)
   const minPrice = Math.min(...prices)
   const maxPrice = Math.max(...prices)
   const saving = (maxPrice - minPrice).toFixed(2)
@@ -71,12 +75,14 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
       <div className="px-4 py-2 divide-y divide-gray-50 flex-1">
         {product.prices.map((pr) => {
           const color = MARKET_COLORS[pr.market] || '#888'
-          const isCheapest = pr.available && pr.currentPrice === minPrice && available.length > 1
-          const isPriciest = pr.available && pr.currentPrice === maxPrice && available.length > 1
+          const effPrice = effectivePrice(pr)
+          const isCheapest = pr.available && effPrice === minPrice && available.length > 1
+          const isPriciest = pr.available && effPrice === maxPrice && available.length > 1
+          const hasCampaign = pr.available && !!pr.campaign
 
           return (
             <div key={pr.market} className="flex items-center justify-between py-1.5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 flex-wrap">
                 <div className="w-1 h-5 rounded-full shrink-0" style={{ background: color }} />
                 {pr.market}
                 {isCheapest && (
@@ -84,15 +90,27 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
                     EN UCUZ
                   </span>
                 )}
+                {hasCampaign && (
+                  <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">
+                    🏷️ {pr.campaign!.name}
+                  </span>
+                )}
               </div>
               {pr.available ? (
-                <span
-                  className={`text-base font-bold ${
-                    isCheapest ? 'text-green-600' : isPriciest ? 'text-red-500' : 'text-gray-800'
-                  }`}
-                >
-                  {pr.currentPrice.toFixed(2)} ₺
-                </span>
+                <div className="text-right shrink-0">
+                  {hasCampaign && (
+                    <div className="text-xs text-gray-400 line-through leading-none">
+                      {pr.currentPrice.toFixed(2)} ₺
+                    </div>
+                  )}
+                  <span
+                    className={`text-base font-bold ${
+                      isCheapest ? 'text-green-600' : isPriciest && !hasCampaign ? 'text-red-500' : 'text-gray-800'
+                    }`}
+                  >
+                    {effPrice.toFixed(2)} ₺
+                  </span>
+                </div>
               ) : (
                 <span className="text-sm text-gray-400 italic">Stokta yok</span>
               )}
