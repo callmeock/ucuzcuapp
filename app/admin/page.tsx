@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getProducts, addProduct, updateProduct, deleteProduct } from '@/lib/db'
-import { Product, CATEGORIES, MARKET_COLORS, CATEGORY_CONFIG, type CampaignType } from '@/lib/types'
+import { Product, CATEGORIES, SUBCATEGORIES, MARKET_COLORS, CATEGORY_CONFIG, type CampaignType } from '@/lib/types'
 import { uploadBrosur, getAllBrosurler, deleteBrosur, type Brosur } from '@/lib/brosurler'
 import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
@@ -13,7 +13,7 @@ type MarketName = 'Migros' | 'A101' | 'BİM' | 'Şok'
 const MARKETS: MarketName[] = ['Migros', 'A101', 'BİM', 'Şok']
 
 const emptyForm = {
-  name: '', brand: '', category: CATEGORIES[0], unit: '', barcode: '', image: '',
+  name: '', brand: '', category: CATEGORIES[0], subcategory: '', unit: '', barcode: '', image: '',
 }
 const emptyPrices: Record<MarketName, string> = { Migros: '', A101: '', 'BİM': '', 'Şok': '' }
 const emptyAvail: Record<MarketName, boolean> = { Migros: true, A101: true, 'BİM': true, 'Şok': true }
@@ -84,6 +84,7 @@ function AdminPanel() {
   const [campaignCashbackUnit, setCampaignCashbackUnit] = useState<Record<MarketName, string>>(emptyCampaignCashbackUnit)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [search, setSearch] = useState('')
+  const [filterCategory, setFilterCategory] = useState('Tümü')
 
   // ── Broşür state ──
   const [brosurler, setBrosurler] = useState<Brosur[]>([])
@@ -154,6 +155,7 @@ function AdminPanel() {
       name: p.name,
       brand: p.brand,
       category: p.category,
+      subcategory: p.subcategory ?? '',
       unit: p.unit,
       barcode: p.barcode ?? '',
       image: p.image ?? '',
@@ -246,6 +248,7 @@ function AdminPanel() {
           name: form.name,
           brand: form.brand,
           category: form.category,
+          subcategory: form.subcategory || null,
           unit: form.unit,
           barcode: form.barcode || null,
           image: form.image || null,
@@ -274,6 +277,7 @@ function AdminPanel() {
         })
         await addProduct({
           name: form.name, brand: form.brand, category: form.category,
+          subcategory: form.subcategory || null,
           unit: form.unit, barcode: form.barcode || null, image: form.image || null, prices,
         })
         showMsg('ok', `"${form.name}" eklendi!`)
@@ -297,10 +301,13 @@ function AdminPanel() {
     load()
   }
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.brand.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = products.filter((p) => {
+    const matchSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.brand.toLowerCase().includes(search.toLowerCase())
+    const matchCat = filterCategory === 'Tümü' || p.category === filterCategory
+    return matchSearch && matchCat
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -563,12 +570,22 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kategori</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:border-blue-400"
-                value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kategori</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:border-blue-400"
+                  value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, subcategory: '' })}>
+                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Alt Kategori</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:border-blue-400"
+                  value={form.subcategory} onChange={(e) => setForm({ ...form, subcategory: e.target.value })}>
+                  <option value="">— Seçiniz —</option>
+                  {(SUBCATEGORIES[form.category] ?? []).map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -693,12 +710,22 @@ function AdminPanel() {
             </h2>
           </div>
 
-          <input
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-blue-400"
-            placeholder="🔍 Ürün veya marka ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="flex gap-2 mb-3">
+            <input
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              placeholder="🔍 Ürün veya marka ara..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-400 text-gray-600 shrink-0"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              <option value="Tümü">Tümü</option>
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
 
           {loading ? (
             <div className="flex justify-center py-10">

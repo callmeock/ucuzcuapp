@@ -17,6 +17,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Tümü')
+  const [activeSubcategory, setActiveSubcategory] = useState('Tümü')
   const [basket, setBasket] = useState<Record<string, Product>>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
@@ -74,14 +75,15 @@ export default function HomePage() {
     const q = search.toLowerCase().trim()
     return products.filter((p) => {
       const matchCat = activeCategory === 'Tümü' || p.category === activeCategory
+      const matchSub = activeSubcategory === 'Tümü' || p.subcategory === activeSubcategory
       const matchQ =
         !q ||
         p.name.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q)
-      return matchCat && matchQ
+      return matchCat && matchSub && matchQ
     })
-  }, [products, search, activeCategory])
+  }, [products, search, activeCategory, activeSubcategory])
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { 'Tümü': products.length }
@@ -90,6 +92,16 @@ export default function HomePage() {
     })
     return counts
   }, [products])
+
+  const subcategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    products
+      .filter((p) => activeCategory === 'Tümü' || p.category === activeCategory)
+      .forEach((p) => {
+        if (p.subcategory) counts[p.subcategory] = (counts[p.subcategory] || 0) + 1
+      })
+    return counts
+  }, [products, activeCategory])
 
   const toggleBasket = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -164,9 +176,12 @@ export default function HomePage() {
         </Link>
 
         <CategoryFilter
-          active={activeCategory}
-          onChange={setActiveCategory}
+          activeCategory={activeCategory}
+          activeSubcategory={activeSubcategory}
+          onCategoryChange={(cat) => { setActiveCategory(cat); setActiveSubcategory('Tümü') }}
+          onSubcategoryChange={setActiveSubcategory}
           counts={categoryCounts}
+          subcategoryCounts={subcategoryCounts}
         />
 
         {/* Stats bar */}

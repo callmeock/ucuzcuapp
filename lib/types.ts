@@ -32,6 +32,7 @@ export interface Product {
   name: string
   brand: string
   category: string
+  subcategory?: string | null
   unit: string
   barcode: string | null
   image?: string | null   // URL veya null (null ise kategori emojisi gösterilir)
@@ -54,6 +55,15 @@ export const CATEGORIES = [
   'Atıştırmalık',
   'İçecek',
 ]
+
+export const SUBCATEGORIES: Record<string, string[]> = {
+  'Meyve & Sebze':    ['Meyve', 'Sebze', 'Yetiştirme Kiti'],
+  'Et, Tavuk & Balık': ['Kırmızı Et', 'Beyaz Et', 'Balık & Deniz Ürünleri', 'Et & Şarküteri', 'Yumurta'],
+  'Süt & Kahvaltılık': ['Süt', 'Peynir', 'Yoğurt', 'Tereyağı', 'Margarin', 'Yumurta', 'Zeytin', 'Sütlü Tatlı & Krema'],
+  'Temel Gıda':        ['Makarna', 'Pirinç & Bulgur', 'Bakliyat', 'Sıvı Yağ', 'Tuz & Baharat', 'Bulyon', 'Konserve', 'Turşu', 'Sos', 'Un', 'Şeker & Tatlılık'],
+  'Atıştırmalık':      ['Kuru Meyve', 'Kuruyemiş', 'Cips', 'Çikolata', 'Gofret', 'Bar & Kaplamalılar', 'Bisküvi', 'Kek'],
+  'İçecek':            ['Gazlı İçecek', 'Gazsız İçecek', 'Çay', 'Kahve', 'Su', 'Maden Suyu'],
+}
 
 export interface CategoryConfig {
   emoji: string
