@@ -14,15 +14,26 @@ interface BasketPanelProps {
   onRemove: (id: string) => void
 }
 
+// Efektif fiyat: discount kampanyasında kart fiyatı, cashback'te normal fiyat
+function effectivePrice(pr: { currentPrice: number; campaign?: { type: string; campaignPrice?: number } | null }) {
+  if (pr.campaign?.type === 'discount' && pr.campaign.campaignPrice != null) {
+    return pr.campaign.campaignPrice
+  }
+  return pr.currentPrice
+}
+
 // En ucuz kombinasyonu hesapla (her ürün için ayrı market)
 function calcCheapest(items: Product[]) {
   let total = 0
   const rows = items.map((p) => {
     const available = p.prices.filter((pr) => pr.available)
-    if (available.length === 0) return { product: p, market: null, price: null }
-    const cheapest = available.reduce((a, b) => a.currentPrice < b.currentPrice ? a : b)
-    total += cheapest.currentPrice
-    return { product: p, market: cheapest.market, price: cheapest.currentPrice }
+    if (available.length === 0) return { product: p, market: null, price: null, hasCampaign: false }
+    const cheapest = available.reduce((a, b) =>
+      effectivePrice(a) < effectivePrice(b) ? a : b
+    )
+    const price = effectivePrice(cheapest)
+    total += price
+    return { product: p, market: cheapest.market, price, hasCampaign: !!cheapest.campaign }
   })
   return { rows, total }
 }
@@ -35,10 +46,11 @@ function calcMarket(items: Product[], market: MarketName) {
     const entry = p.prices.find((pr) => pr.market === market)
     if (!entry || !entry.available) {
       unavailableCount++
-      return { product: p, price: null, available: false }
+      return { product: p, price: null, available: false, hasCampaign: false }
     }
-    total += entry.currentPrice
-    return { product: p, price: entry.currentPrice, available: true }
+    const price = effectivePrice(entry)
+    total += price
+    return { product: p, price, available: true, hasCampaign: !!entry.campaign }
   })
   return { rows, total, unavailableCount }
 }
@@ -88,7 +100,7 @@ export default function BasketPanel({ open, onClose, basket, onRemove }: BasketP
             <div className="border-b border-gray-100 divide-y divide-gray-50 overflow-y-auto shrink-0 max-h-44">
               {items.map((p) => {
                 const available = p.prices.filter((pr) => pr.available)
-                const minPrice = available.length ? Math.min(...available.map((pr) => pr.currentPrice)) : null
+                const minPrice = available.length ? Math.min(...available.map(effectivePrice)) : null
                 return (
                   <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
                     <div className="flex-1 min-w-0">
