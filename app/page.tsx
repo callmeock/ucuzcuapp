@@ -21,6 +21,7 @@ export default function HomePage() {
   const [basket, setBasket] = useState<Record<string, Product>>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(50)
 
   // ── Lokasyon ──
   const [location, setLocation] = useState<UserLocation | null>(null)
@@ -84,6 +85,11 @@ export default function HomePage() {
       return matchCat && matchSub && matchQ
     })
   }, [products, search, activeCategory, activeSubcategory])
+
+  // Filtre değişince sayacı sıfırla
+  useEffect(() => { setVisibleCount(50) }, [search, activeCategory, activeSubcategory])
+
+  const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { 'Tümü': products.length }
@@ -240,17 +246,29 @@ export default function HomePage() {
 
         {/* Product Grid */}
         {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                inBasket={!!basket[p.id]}
-                onClick={() => setSelectedProduct(p)}
-                onAddToBasket={(e) => toggleBasket(p, e)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visibleProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  inBasket={!!basket[p.id]}
+                  onClick={() => setSelectedProduct(p)}
+                  onAddToBasket={(e) => toggleBasket(p, e)}
+                />
+              ))}
+            </div>
+            {visibleCount < filtered.length && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={() => setVisibleCount((n) => n + 50)}
+                  className="bg-white border border-gray-200 shadow-sm text-gray-700 font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Daha Fazla Göster ({filtered.length - visibleCount} ürün daha)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
 
