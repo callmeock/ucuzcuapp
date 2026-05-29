@@ -60,7 +60,7 @@ export async function requestLocation(): Promise<UserLocation> {
         const { district, city } = await reverseGeocode(lat, lng)
         const label = [district, city].filter(Boolean).join(', ') || 'Konumunuz'
         const loc: UserLocation = { lat, lng, district, city, label, savedAt: Date.now() }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(loc))
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(loc)) } catch { /* private mode */ }
         resolve(loc)
       },
       (err) => {

@@ -45,7 +45,7 @@ export default function HomePage() {
     } catch {
       // izin reddedildi — banner'ı kapat
       setLocationDismissed(true)
-      localStorage.setItem('ucuzcu_loc_dismissed', '1')
+      try { localStorage.setItem('ucuzcu_loc_dismissed', '1') } catch { /* private mode */ }
     } finally {
       setLocationLoading(false)
     }
@@ -53,7 +53,7 @@ export default function HomePage() {
 
   const handleDismissLocation = () => {
     setLocationDismissed(true)
-    localStorage.setItem('ucuzcu_loc_dismissed', '1')
+    try { localStorage.setItem('ucuzcu_loc_dismissed', '1') } catch { /* private mode */ }
   }
 
   const showLocationBanner = !location && !locationDismissed
@@ -154,7 +154,7 @@ export default function HomePage() {
             <span className="text-sm">📍</span>
             <span className="text-sm text-gray-600 font-semibold">{location.label}</span>
             <button
-              onClick={() => { clearLocation(); setLocation(null); setLocationDismissed(false); localStorage.removeItem('ucuzcu_loc_dismissed') }}
+              onClick={() => { clearLocation(); setLocation(null); setLocationDismissed(false); try { localStorage.removeItem('ucuzcu_loc_dismissed') } catch { /* ignore */ } }}
               className="text-xs text-gray-400 hover:text-gray-600 ml-1"
             >
               Değiştir
