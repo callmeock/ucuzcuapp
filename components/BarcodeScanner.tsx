@@ -9,7 +9,6 @@ interface BarcodeScannerProps {
 
 export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const zxingRef = useRef<any>(null)
@@ -82,55 +81,23 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
   const startZxing = useCallback(async () => {
     setUseZxing(true)
     try {
-      const { BrowserMultiFormatReader, NotFoundException } = await import('@zxing/library')
+      const { BrowserMultiFormatReader } = await import('@zxing/library')
       const reader = new BrowserMultiFormatReader()
       zxingRef.current = reader
 
-      // Kamera izni + stream
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      })
-      streamRef.current = stream
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-
       setStatus('scanning')
 
-      // ZXing döngüsü — canvas üzerinden okuma (iOS Safari uyumlu)
-      const tick = async () => {
-        const video = videoRef.current
-        const canvas = canvasRef.current
-        if (!video || !canvas || !zxingRef.current) return
-        // Video hazır değilse bekle
-        if (video.readyState < 4 || video.videoWidth === 0) {
-          rafRef.current = requestAnimationFrame(tick)
-          return
-        }
-        // Her frame'i canvas'a çiz, oradan oku
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { rafRef.current = requestAnimationFrame(tick); return }
-        ctx.drawImage(video, 0, 0)
-        try {
-          const result = await reader.decodeFromCanvas(canvas)
+      // decodeFromConstraints: ZXing kendi stream yönetimini yapıyor (iOS uyumlu)
+      await reader.decodeFromConstraints(
+        { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+        videoRef.current!,
+        (result, _err) => {
           if (result) {
             stopCamera()
             onDetected(result.getText())
-            return
-          }
-        } catch (e: any) {
-          if (!(e instanceof NotFoundException)) {
-            // gerçek hata değil, sadece bulunamadı
           }
         }
-        rafRef.current = requestAnimationFrame(tick)
-      }
-      rafRef.current = requestAnimationFrame(tick)
-
+      )
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
         setErrorMsg('Kamera izni gerekli. Safari → Ayarlar → ucuzcuapp.com → Kamera → İzin Ver')
@@ -198,7 +165,6 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
       {/* Kamera */}
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
-        <canvas ref={canvasRef} className="hidden" />
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
 
         {/* Tarama çerçevesi */}
