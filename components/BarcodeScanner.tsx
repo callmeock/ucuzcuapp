@@ -9,6 +9,7 @@ interface BarcodeScannerProps {
 
 export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
   const zxingRef = useRef<any>(null)
@@ -98,11 +99,24 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
       setStatus('scanning')
 
-      // ZXing döngüsü
+      // ZXing döngüsü — canvas üzerinden okuma (iOS Safari uyumlu)
       const tick = async () => {
-        if (!videoRef.current || !zxingRef.current) return
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        if (!video || !canvas || !zxingRef.current) return
+        // Video hazır değilse bekle
+        if (video.readyState < 4 || video.videoWidth === 0) {
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+        // Her frame'i canvas'a çiz, oradan oku
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { rafRef.current = requestAnimationFrame(tick); return }
+        ctx.drawImage(video, 0, 0)
         try {
-          const result = await reader.decodeFromVideoElement(videoRef.current)
+          const result = await reader.decodeFromCanvas(canvas)
           if (result) {
             stopCamera()
             onDetected(result.getText())
@@ -184,6 +198,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
       {/* Kamera */}
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
+        <canvas ref={canvasRef} className="hidden" />
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
 
         {/* Tarama çerçevesi */}

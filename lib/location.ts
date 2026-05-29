@@ -56,12 +56,16 @@ export async function requestLocation(): Promise<UserLocation> {
     }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        const { district, city } = await reverseGeocode(lat, lng)
-        const label = [district, city].filter(Boolean).join(', ') || 'Konumunuz'
-        const loc: UserLocation = { lat, lng, district, city, label, savedAt: Date.now() }
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(loc)) } catch { /* private mode */ }
-        resolve(loc)
+        try {
+          const { latitude: lat, longitude: lng } = pos.coords
+          const { district, city } = await reverseGeocode(lat, lng)
+          const label = [district, city].filter(Boolean).join(', ') || 'Konumunuz'
+          const loc: UserLocation = { lat, lng, district, city, label, savedAt: Date.now() }
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(loc)) } catch { /* private mode */ }
+          resolve(loc)
+        } catch (err) {
+          reject(err)
+        }
       },
       (err) => {
         if (err.code === 1) reject(new Error('Konum izni reddedildi'))
