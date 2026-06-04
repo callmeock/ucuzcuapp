@@ -15,17 +15,29 @@ import { Product } from './types'
 
 const COL = 'products'
 
+// brand alanı Migros scraper'dan obje olarak gelebilir: {name, id, prettyName}
+function normalizeBrand(brand: any): string {
+  if (!brand) return ''
+  if (typeof brand === 'string') return brand
+  if (typeof brand === 'object') return brand.name || ''
+  return String(brand)
+}
+
+function normalizeProduct(id: string, data: any): Product {
+  return { ...data, id, brand: normalizeBrand(data.brand) } as Product
+}
+
 export async function getProducts(): Promise<Product[]> {
   const q = query(collection(db, COL), orderBy('name'))
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product))
+  return snapshot.docs.map((d) => normalizeProduct(d.id, d.data()))
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
   const ref = doc(db, COL, id)
   const snap = await getDoc(ref)
   if (!snap.exists()) return null
-  return { id: snap.id, ...snap.data() } as Product
+  return normalizeProduct(snap.id, snap.data())
 }
 
 export async function addProduct(product: Omit<Product, 'id'>): Promise<string> {
