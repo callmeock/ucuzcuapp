@@ -49,6 +49,19 @@ export async function submitPrice(data: {
   return ref.id
 }
 
+// ── Barkoda göre bekleyen bildirimleri getir ─────────────────────
+export async function getPendingSubmissionsByBarcode(barcode: string): Promise<PriceSubmission[]> {
+  const q = query(
+    collection(db, SUB_COL),
+    where('barcode', '==', barcode),
+    limit(10)
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as PriceSubmission))
+    .filter(s => s.status === 'pending')
+}
+
 // ── Bekleyen bildirimleri getir ───────────────────────────────────
 export async function getPendingSubmissions(limitN = 20): Promise<PriceSubmission[]> {
   const q = query(

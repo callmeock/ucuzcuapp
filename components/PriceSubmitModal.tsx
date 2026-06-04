@@ -1,10 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { getProductByBarcode, searchProductsByName, submitPrice } from '@/lib/submissions'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/auth'
+import {
+  getProductByBarcode, searchProductsByName, submitPrice,
+  getPendingSubmissionsByBarcode, voteSubmission,
+} from '@/lib/submissions'
 import { addGuestPoints, getGuestPoints } from '@/lib/points'
 import { POINTS, MarketName } from '@/lib/types'
-import type { Product } from '@/lib/types'
+import type { Product, PriceSubmission } from '@/lib/types'
+import { doc, updateDoc, increment } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 interface Props {
   barcode: string
@@ -21,7 +27,13 @@ const MARKET_STYLES: Record<string, { bg: string; text: string; border: string }
   'BİM':  { bg: 'bg-blue-50',    text: 'text-blue-700',   border: 'border-blue-400' },
 }
 
+// Fiyatlar %5 tolerans içinde aynı sayılır
+function isSamePrice(a: number, b: number) {
+  return Math.abs(a - b) / Math.max(a, b) <= 0.05
+}
+
 export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props) {
+  const { user } = useAuth()
   const [step, setStep] = useState<'loading' | 'product' | 'price' | 'submitting' | 'done'>('loading')
   const [product, setProduct] = useState<Product | null>(null)
   const [productName, setProductName] = useState('')
@@ -31,20 +43,45 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
   const [priceInput, setPriceInput] = useState('')
   const [error, setError] = useState('')
 
-  // Barkod alındıktan sonra ürünü bul
+  // Barkod için bekleyen bildirimler
+  const [pendingByMarket, setPendingByMarket] = useState<Record<string, PriceSubmission>>({})
+  // Seçilen markete ait bekleyen bildirim
+  const [marketPending, setMarketPending] = useState<PriceSubmission | null>(null)
+  // Submit sonucu oluşan doğrulama mesajı
+  const [verifyMsg, setVerifyMsg] = useState('')
+  // Kazanılan toplam puan (submit + verify)
+  const [earnedPoints, setEarnedPoints] = useState<number>(POINTS.SUBMIT)
+
+  // İlk yükleme: ürün + bekleyen bildirimler
   useState(() => {
     const init = async () => {
       try {
-        const found = await getProductByBarcode(barcode)
+        const [found, pending] = await Promise.all([
+          getProductByBarcode(barcode),
+          getPendingSubmissionsByBarcode(barcode),
+        ])
         if (found) {
           setProduct(found)
           setProductName(found.name)
         }
+        // market → en son pending submission map'i
+        const byMarket: Record<string, PriceSubmission> = {}
+        for (const sub of pending) {
+          // Kendi bildirimimiz varsa gösterme
+          if (user && sub.submittedBy === user.uid) continue
+          if (!byMarket[sub.market]) byMarket[sub.market] = sub
+        }
+        setPendingByMarket(byMarket)
       } catch { /* ignore */ }
       setStep('product')
     }
     init()
   })
+
+  // Market seçimi değişince ilgili pending'i güncelle
+  useEffect(() => {
+    setMarketPending(selectedMarket ? (pendingByMarket[selectedMarket] ?? null) : null)
+  }, [selectedMarket, pendingByMarket])
 
   const handleSearch = async () => {
     if (productName.trim().length < 2) return
@@ -76,19 +113,50 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
     setStep('submitting')
 
     try {
+      // 1. Fiyat bildirimi gönder
       await submitPrice({
         barcode,
         productId: product?.id ?? null,
         productName: productName.trim(),
         market: selectedMarket,
         price,
-        submittedBy: null,      // misafir
-        submittedByName: null,
+        submittedBy: user?.uid ?? null,
+        submittedByName: user?.displayName ?? null,
       })
 
+      let totalPoints = POINTS.SUBMIT
+      let msg = ''
+
+      // 2. Bekleyen bildirime otomatik oy at (sadece üyeler)
+      if (marketPending && user) {
+        try {
+          const same = isSamePrice(price, marketPending.price)
+          const vote = same ? 'verify' : 'reject'
+          await voteSubmission(marketPending.id, user.uid, vote)
+
+          if (same) {
+            // Doğrulama puanı
+            totalPoints += POINTS.VERIFY
+            await updateDoc(doc(db, 'users', user.uid), {
+              points: increment(POINTS.VERIFY),
+              verificationsCount: increment(1),
+            })
+            msg = `✅ Aynı fiyatı doğruladın! Ekstra +${POINTS.VERIFY}⭐`
+          } else {
+            msg = `⚠️ Farklı fiyat — eski bildirim reddedildi`
+          }
+        } catch {
+          // Oy atamazsa (zaten oy verilmiş vb.) sessizce geç
+        }
+      }
+
+      setVerifyMsg(msg)
+      setEarnedPoints(totalPoints)
+
+      // 3. Guest puan (localStorage)
       const newPoints = addGuestPoints(POINTS.SUBMIT, `${selectedMarket} fiyat bildirimi`)
       setStep('done')
-      setTimeout(() => onSuccess(newPoints), 1500)
+      setTimeout(() => onSuccess(newPoints), 1800)
     } catch (err: any) {
       setError('Gönderilemedi: ' + err.message)
       setStep('price')
@@ -208,22 +276,43 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
                   {MARKETS.map(m => {
                     const style = MARKET_STYLES[m]
                     const selected = selectedMarket === m
+                    const hasPending = !!pendingByMarket[m]
                     return (
                       <button
                         key={m}
                         onClick={() => setSelectedMarket(m)}
-                        className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all relative ${
                           selected
                             ? `${style.bg} ${style.text} ${style.border} scale-[1.02]`
                             : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         {m}
+                        {hasPending && (
+                          <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-yellow-400 rounded-full border border-white" title="Bekleyen bildirim var"/>
+                        )}
                       </button>
                     )
                   })}
                 </div>
               </div>
+
+              {/* Bekleyen bildirim banner */}
+              {marketPending && (
+                <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                  <span className="text-lg">👀</span>
+                  <div>
+                    <p className="text-xs font-semibold text-yellow-800">
+                      Bu markette ₺{marketPending.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} bildirilmiş
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-0.5">
+                      {user
+                        ? `Aynı fiyatı görüyorsan otomatik doğrulama yapılır ve +${POINTS.VERIFY}⭐ kazanırsın!`
+                        : 'Giriş yaparsan aynı fiyatı doğrulayarak ekstra puan kazanabilirsin.'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Fiyat */}
               <div>
@@ -250,7 +339,9 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
               <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-xl">
                 <span className="text-xl">⭐</span>
                 <div>
-                  <p className="text-sm font-semibold text-yellow-800">+{POINTS.SUBMIT} puan kazanırsın</p>
+                  <p className="text-sm font-semibold text-yellow-800">
+                    +{POINTS.SUBMIT} puan{marketPending && user ? ` (+ ${POINTS.VERIFY} doğrulama bonusu)` : ''} kazanırsın
+                  </p>
                   <p className="text-xs text-yellow-600">Şu anki puanın: {getGuestPoints()}</p>
                 </div>
               </div>
@@ -287,9 +378,14 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
                 <p className="text-sm text-gray-500 mt-1">Bildirim incelemeye alındı.</p>
               </div>
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-6 py-3">
-                <p className="text-2xl font-bold text-yellow-700">+{POINTS.SUBMIT} ⭐</p>
+                <p className="text-2xl font-bold text-yellow-700">+{earnedPoints} ⭐</p>
                 <p className="text-xs text-yellow-600">puan kazandın!</p>
               </div>
+              {verifyMsg && (
+                <p className="text-sm font-medium text-gray-700 bg-gray-50 rounded-xl px-4 py-2">
+                  {verifyMsg}
+                </p>
+              )}
               <p className="text-xs text-gray-400">
                 3 kişi onaylarsa fiyat sisteme işlenecek<br/>
                 ve +{POINTS.SUBMISSION_VERIFIED} puan daha kazanacaksın.
