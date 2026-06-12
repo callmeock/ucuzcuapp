@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getProducts } from '@/lib/db'
-import { Product } from '@/lib/types'
+import { Product, Basket } from '@/lib/types'
 import Link from 'next/link'
 import { FixedLogoBar, SearchBar } from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
@@ -20,7 +20,7 @@ export default function HomePage() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Tümü')
   const [activeSubcategory, setActiveSubcategory] = useState('Tümü')
-  const [basket, setBasket] = useState<Record<string, Product>>({})
+  const [basket, setBasket] = useState<Basket>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(50)
@@ -145,17 +145,32 @@ export default function HomePage() {
     return () => obs.disconnect()
   }, [filtered.length, loading])
 
-  const toggleBasket = (product: Product, e: React.MouseEvent) => {
+  const addToBasket = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
+    setBasket((prev) => ({
+      ...prev,
+      [product.id]: {
+        product,
+        quantity: (prev[product.id]?.quantity ?? 0) + 1,
+      },
+    }))
+  }
+
+  const updateBasketQuantity = (id: string, delta: number) => {
     setBasket((prev) => {
-      const next = { ...prev }
-      if (next[product.id]) delete next[product.id]
-      else next[product.id] = product
-      return next
+      const entry = prev[id]
+      if (!entry) return prev
+      const quantity = entry.quantity + delta
+      if (quantity <= 0) {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      }
+      return { ...prev, [id]: { ...entry, quantity } }
     })
   }
 
-  const basketCount = Object.keys(basket).length
+  const basketCount = Object.values(basket).reduce((sum, e) => sum + e.quantity, 0)
 
   return (
     <>
@@ -260,9 +275,9 @@ export default function HomePage() {
                   <ProductCard
                     key={p.id}
                     product={p}
-                    inBasket={!!basket[p.id]}
+                    basketQuantity={basket[p.id]?.quantity ?? 0}
                     onClick={() => setSelectedProduct(p)}
-                    onAddToBasket={(e) => toggleBasket(p, e)}
+                    onAddToBasket={(e) => addToBasket(p, e)}
                   />
                 ))}
               </div>
@@ -300,13 +315,7 @@ export default function HomePage() {
         open={basketOpen}
         onClose={() => setBasketOpen(false)}
         basket={basket}
-        onRemove={(id) =>
-          setBasket((prev) => {
-            const next = { ...prev }
-            delete next[id]
-            return next
-          })
-        }
+        onUpdateQuantity={updateBasketQuantity}
       />
     </>
   )

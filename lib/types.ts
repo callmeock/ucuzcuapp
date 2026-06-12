@@ -40,6 +40,13 @@ export interface Product {
   createdAt?: Date
 }
 
+export interface BasketEntry {
+  product: Product
+  quantity: number
+}
+
+export type Basket = Record<string, BasketEntry>
+
 export const MARKET_COLORS: Record<string, string> = {
   Migros: '#f97316',
   A101: '#dc2626',

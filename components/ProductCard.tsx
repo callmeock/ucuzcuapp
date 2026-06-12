@@ -5,7 +5,7 @@ import { Product, MARKET_COLORS, CATEGORY_CONFIG } from '@/lib/types'
 
 interface ProductCardProps {
   product: Product
-  inBasket: boolean
+  basketQuantity: number
   onClick: () => void
   onAddToBasket: (e: React.MouseEvent) => void
 }
@@ -17,7 +17,8 @@ function getEffectivePrice(p: Product['prices'][0]) {
   return p.currentPrice
 }
 
-export default function ProductCard({ product, inBasket, onClick, onAddToBasket }: ProductCardProps) {
+export default function ProductCard({ product, basketQuantity, onClick, onAddToBasket }: ProductCardProps) {
+  const inBasket = basketQuantity > 0
   const available = product.prices.filter((p) => p.available)
   if (available.length === 0) return null
 
@@ -46,7 +47,9 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
             <span className="text-3xl select-none">{catCfg.emoji}</span>
           )}
           {inBasket && (
-            <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-green-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold">✓</span>
+            <span className="absolute top-0.5 right-0.5 min-w-[1.25rem] h-5 px-1 bg-green-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold">
+              {basketQuantity}
+            </span>
           )}
         </div>
 
@@ -71,11 +74,11 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
             </div>
             <button
               onClick={onAddToBasket}
-              className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              className={`shrink-0 min-w-[2rem] px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                 inBasket ? 'bg-green-500 text-white' : 'bg-primary text-white hover:bg-primary-dark'
               }`}
             >
-              {inBasket ? '✓' : '+'}
+              {inBasket ? `+ (${basketQuantity})` : '+'}
             </button>
           </div>
         </div>
@@ -94,7 +97,7 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
           </span>
           {inBasket && (
             <span className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              ✓ Sepette
+              {basketQuantity} adet
             </span>
           )}
         </div>
@@ -165,7 +168,7 @@ export default function ProductCard({ product, inBasket, onClick, onAddToBasket 
               inBasket ? 'bg-green-500 text-white' : 'bg-primary text-white hover:bg-primary-dark'
             }`}
           >
-            {inBasket ? '✓ Sepette' : '+ Ekle'}
+            {inBasket ? `+ Ekle (${basketQuantity})` : '+ Ekle'}
           </button>
         </div>
       </div>
