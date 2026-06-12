@@ -43,7 +43,7 @@ export default function GirisPage() {
       {/* Header */}
       <div className="px-4 py-4">
         <Link href="/" className="flex items-center gap-2 w-fit">
-          <span className="text-2xl">🏷️</span>
+          <img src="/logo.png" alt="Ucuzcu" className="w-8 h-8 rounded-lg object-cover" />
           <span className="font-extrabold text-xl text-gray-800">Ucuzcu</span>
         </Link>
       </div>

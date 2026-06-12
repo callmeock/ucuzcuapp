@@ -27,8 +27,8 @@ export default function Header({ search, onSearch, basketCount, onBasketOpen }: 
     <header className="bg-primary sticky top-0 z-50 shadow-md safe-top">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-2 sm:gap-3">
         {/* Logo */}
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-2xl">🏷️</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <img src="/logo.png" alt="Ucuzcu" className="w-8 h-8 rounded-lg object-cover" />
           <span className="text-white font-extrabold text-xl tracking-tight">Ucuzcu</span>
           <span className="text-white/60 text-xs hidden sm:inline ml-1">market karşılaştırma</span>
         </div>

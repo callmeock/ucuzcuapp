@@ -1,86 +1,50 @@
 /**
- * SVG → PWA ikonları üretir.
+ * Logo PNG → PWA ikonları üretir.
+ * Kaynak: assets/logo.png
  * Kullanım: node scripts/generate-icons.mjs
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { execSync } from 'child_process'
+import { existsSync, mkdirSync, cpSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { execSync } from 'child_process'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const root = join(__dirname, '..')
-const svgPath = join(root, 'public', 'icon.svg')
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const src = join(root, 'assets', 'logo.png')
 const outDir = join(root, 'public', 'icons')
+const BRAND_BG = '00B8D8' // logo turkuaz arka plan
+
+if (!existsSync(src)) {
+  console.error('assets/logo.png bulunamadı.')
+  process.exit(1)
+}
 
 mkdirSync(outDir, { recursive: true })
 
-const sizes = [
-  { name: 'icon-192.png', size: 192 },
-  { name: 'icon-512.png', size: 512 },
-  { name: 'icon-maskable-512.png', size: 512, pad: 0.15 },
-]
-
-// macOS sips ile SVG→PNG (qlmanage veya rsvg yoksa basit fallback)
-function renderPng(size, pad = 0) {
-  const out = join(outDir, `tmp-${size}.png`)
-  try {
-    // qlmanage macOS'ta SVG render eder
-    execSync(`qlmanage -t -s ${size} -o "${outDir}" "${svgPath}" 2>/dev/null`, { stdio: 'pipe' })
-    const generated = join(outDir, 'icon.svg.png')
-    if (pad > 0) {
-      // Maskable: içerik küçült (kenar boşluğu)
-      const inner = Math.round(size * (1 - pad * 2))
-      execSync(`sips -z ${inner} ${inner} "${generated}" --out "${out}" 2>/dev/null`, { stdio: 'pipe' })
-      // Beyaz arka planlı kare oluştur
-      execSync(
-        `sips -z ${size} ${size} "${out}" --padColor e63946 --padToHeightWidth ${size} ${size} --out "${out}" 2>/dev/null`,
-        { stdio: 'pipe' }
-      )
-    } else {
-      execSync(`cp "${generated}" "${out}"`, { stdio: 'pipe' })
-    }
-    return out
-  } catch {
-    return null
-  }
-}
-
-// Fallback: minimal PNG (düz kırmızı kare) — araç yoksa
-function writeFallbackPng(filename, size) {
-  // 1x1 kırmızı PNG base64, sips ile büyüt
-  const tiny = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-    'base64'
-  )
-  const tmp = join(outDir, 'tiny.png')
-  writeFileSync(tmp, tiny)
-  const out = join(outDir, filename)
-  try {
-    execSync(`sips -z ${size} ${size} "${tmp}" --out "${out}" 2>/dev/null`, { stdio: 'pipe' })
-  } catch {
-    writeFileSync(out, tiny)
-  }
-}
-
-for (const { name, size, pad = 0 } of sizes) {
-  const rendered = renderPng(size, pad)
-  const dest = join(outDir, name)
-  if (rendered) {
-    try {
-      execSync(`cp "${rendered}" "${dest}"`, { stdio: 'pipe' })
-    } catch {
-      writeFallbackPng(name, size)
-    }
+function resize(size, out, pad = 0) {
+  if (pad > 0) {
+    const inner = Math.round(size * (1 - pad * 2))
+    const tmp = join(outDir, `_tmp-${size}.png`)
+    execSync(`sips -z ${inner} ${inner} "${src}" --out "${tmp}"`, { stdio: 'pipe' })
+    execSync(
+      `sips -z ${size} ${size} "${tmp}" --padColor ${BRAND_BG} --padToHeightWidth ${size} ${size} --out "${out}"`,
+      { stdio: 'pipe' }
+    )
   } else {
-    writeFallbackPng(name, size)
+    execSync(`sips -z ${size} ${size} "${src}" --out "${out}"`, { stdio: 'pipe' })
   }
-  console.log(`✓ ${name}`)
 }
 
-// Apple touch icon
-try {
-  execSync(`cp "${join(outDir, 'icon-192.png')}" "${join(root, 'public', 'apple-touch-icon.png')}"`, { stdio: 'pipe' })
-  console.log('✓ apple-touch-icon.png')
-} catch {}
+resize(192, join(outDir, 'icon-192.png'))
+resize(512, join(outDir, 'icon-512.png'))
+resize(512, join(outDir, 'icon-maskable-512.png'), 0.08)
 
-console.log('İkonlar hazır:', outDir)
+cpSync(join(outDir, 'icon-192.png'), join(root, 'public', 'apple-touch-icon.png'))
+
+// App Store / native kaynak (1024)
+execSync(`sips -z 1024 1024 "${src}" --out "${join(root, 'assets', 'icon.png')}"`, { stdio: 'pipe' })
+
+console.log('✓ icon-192.png')
+console.log('✓ icon-512.png')
+console.log('✓ icon-maskable-512.png')
+console.log('✓ apple-touch-icon.png')
+console.log('✓ assets/icon.png (1024)')

@@ -11,7 +11,7 @@ export default function NativeShell({ children }: { children: ReactNode }) {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
         await StatusBar.setStyle({ style: Style.Light })
-        await StatusBar.setBackgroundColor({ color: '#e63946' })
+        await StatusBar.setBackgroundColor({ color: '#00B8D8' })
       } catch { /* web'de yok */ }
 
       try {

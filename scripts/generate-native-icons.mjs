@@ -1,17 +1,25 @@
 /**
- * macOS sips ile iOS/Android native ikonları üretir.
+ * Logo → iOS/Android native ikonları ve splash ekranları.
+ * Kaynak: assets/logo.png
  * Kullanım: node scripts/generate-native-icons.mjs
  */
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync, cpSync } from 'fs'
+import { existsSync, mkdirSync, cpSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const src = join(root, 'assets', 'icon.png')
+const src = join(root, 'assets', 'logo.png')
+const icon1024 = join(root, 'assets', 'icon.png')
+const BRAND_BG = '00B8D8'
+
 if (!existsSync(src)) {
-  console.error('assets/icon.png bulunamadı. Önce: pnpm icons')
+  console.error('assets/logo.png bulunamadı.')
   process.exit(1)
+}
+
+if (!existsSync(icon1024)) {
+  execSync(`sips -z 1024 1024 "${src}" --out "${icon1024}"`, { stdio: 'pipe' })
 }
 
 const androidSizes = {
@@ -27,18 +35,26 @@ for (const [folder, size] of Object.entries(androidSizes)) {
   mkdirSync(dir, { recursive: true })
   for (const name of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
     const out = join(dir, name)
-    const fgSize = name.includes('foreground') ? Math.round(size * 0.65) : size
-    execSync(`sips -z ${fgSize} ${fgSize} "${src}" --out "${out}"`, { stdio: 'pipe' })
+    const s = name.includes('foreground') ? Math.round(size * 0.85) : size
+    execSync(`sips -z ${s} ${s} "${src}" --out "${out}"`, { stdio: 'pipe' })
   }
   console.log(`✓ android/${folder}`)
 }
 
-// iOS App Icon (1024)
+// iOS App Icon
 const iosIcon = join(root, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-512@2x.png')
-cpSync(src, iosIcon)
+cpSync(icon1024, iosIcon)
 console.log('✓ ios AppIcon')
 
-// Splash: kırmızı arka plan + ortada logo
+// iOS Splash
+const iosSplashDir = join(root, 'ios', 'App', 'App', 'Assets.xcassets', 'Splash.imageset')
+const iosSplash = join(iosSplashDir, 'splash-2732x2732.png')
+execSync(`sips -z 1200 1200 "${src}" --padColor ${BRAND_BG} --padToHeightWidth 2732 2732 --out "${iosSplash}"`, { stdio: 'pipe' })
+cpSync(iosSplash, join(iosSplashDir, 'splash-2732x2732-1.png'))
+cpSync(iosSplash, join(iosSplashDir, 'splash-2732x2732-2.png'))
+console.log('✓ ios Splash')
+
+// Android splash
 const splashSizes = [
   ['drawable/splash.png', 480],
   ['drawable-port-mdpi/splash.png', 320],
@@ -52,11 +68,14 @@ for (const [rel, size] of splashSizes) {
   const dir = join(root, 'android', 'app', 'src', 'main', 'res', dirname(rel))
   const out = join(root, 'android', 'app', 'src', 'main', 'res', rel)
   mkdirSync(dir, { recursive: true })
-  // Düz kırmızı splash
-  const tmp = join(root, 'assets', '_splash_tmp.png')
-  execSync(`sips -z ${size} ${size} "${src}" --padColor e63946 --padToHeightWidth ${size} ${size} --out "${tmp}"`, { stdio: 'pipe' })
-  cpSync(tmp, out)
+  const logoSize = Math.round(size * 0.55)
+  const tmp = join(root, 'assets', '_splash_logo.png')
+  execSync(`sips -z ${logoSize} ${logoSize} "${src}" --out "${tmp}"`, { stdio: 'pipe' })
+  execSync(
+    `sips -z ${size} ${size} "${tmp}" --padColor ${BRAND_BG} --padToHeightWidth ${size} ${size} --out "${out}"`,
+    { stdio: 'pipe' }
+  )
+  try { unlinkSync(tmp) } catch {}
 }
 console.log('✓ android splash screens')
-
 console.log('Native ikonlar hazır.')
