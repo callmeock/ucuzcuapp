@@ -38,7 +38,7 @@ export default function BottomTabBar() {
       onPointerDown={() => setPressed(key)}
       onPointerUp={() => setPressed(null)}
       onPointerLeave={() => setPressed(null)}
-      className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 rounded-xl mx-0.5 transition-colors duration-100 select-none ${
+      className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 h-full py-1 rounded-xl mx-0.5 transition-colors duration-100 select-none ${
         active
           ? 'text-primary bg-primary/10'
           : pressed === key
@@ -52,24 +52,24 @@ export default function BottomTabBar() {
   )
 
   return (
-    <nav
-      className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-2px_16px_rgba(0,0,0,0.05)] lg:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <div className="flex items-stretch h-14 max-w-lg mx-auto px-1">
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-2px_16px_rgba(0,0,0,0.05)] lg:hidden">
+      {/* Tab satırı — safe area'nın hemen üstünde */}
+      <div className="flex items-center h-14 max-w-lg mx-auto px-2">
         {TABS.map((tab) => {
           const isActive = tab.match(pathname)
           return tabBtn(
             isActive,
             <>
-              <span className="text-[22px] leading-none">{tab.icon}</span>
-              <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-semibold'}`}>{tab.label}</span>
+              <span className="flex h-6 items-center justify-center text-[22px] leading-none">{tab.icon}</span>
+              <span className={`text-[10px] leading-tight ${isActive ? 'font-bold' : 'font-semibold'}`}>{tab.label}</span>
             </>,
             () => navigate(tab.href),
             tab.href
           )
         })}
       </div>
+      {/* Home indicator alanı — içerik buraya taşmaz */}
+      <div aria-hidden className="h-[env(safe-area-inset-bottom,0px)]" />
     </nav>
   )
 }
