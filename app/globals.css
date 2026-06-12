@@ -7,7 +7,7 @@
   --a101: #dc2626;
   --bim: #2563eb;
   --sok: #7c3aed;
-  --primary: #e63946;
+  --primary: #09DEFF;
 }
 
 html {
@@ -27,6 +27,13 @@ body {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Native Capacitor — tarayıcı çubuğu yok, tam ekran */
+html.native-app,
+body.native-app {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbar gizle (category bar için) */

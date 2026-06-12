@@ -5,30 +5,40 @@ const config: CapacitorConfig = {
   appName: 'Ucuzcu',
   webDir: 'public',
   server: {
-    // Canlı site — web deploy'ları anında mobilde yansır
     url: 'https://ucuzcuapp.com',
     cleartext: false,
     androidScheme: 'https',
+    allowNavigation: [
+      'ucuzcuapp.com',
+      '*.ucuzcuapp.com',
+      'accounts.google.com',
+      '*.google.com',
+      '*.googleapis.com',
+      '*.firebaseapp.com',
+      '*.firebase.com',
+      'nominatim.openstreetmap.org',
+    ],
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
+      launchShowDuration: 1500,
       launchAutoHide: true,
-      backgroundColor: '#00B8D8',
+      backgroundColor: '#09DEFF',
       androidSplashResourceName: 'splash',
-      androidScaleType: 'CENTER_CROP',
+      androidScaleType: 'CENTER_INSIDE',
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
     },
     StatusBar: {
-      style: 'LIGHT',
-      backgroundColor: '#00B8D8',
+      style: 'DARK',
+      backgroundColor: '#09DEFF',
     },
   },
   ios: {
     contentInset: 'automatic',
     scheme: 'Ucuzcu',
+    appendUserAgent: ' UcuzcuNativeApp/1.0',
   },
 }
 

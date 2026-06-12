@@ -11,7 +11,8 @@ import { fileURLToPath } from 'url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const src = join(root, 'assets', 'logo.png')
 const icon1024 = join(root, 'assets', 'icon.png')
-const BRAND_BG = '00B8D8'
+const BRAND_BG = '09DEFF'
+const SPLASH_LOGO_RATIO = 0.28 // ekranın ~%28'i — çok büyük görünmesin
 
 if (!existsSync(src)) {
   console.error('assets/logo.png bulunamadı.')
@@ -46,10 +47,14 @@ const iosIcon = join(root, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appi
 cpSync(icon1024, iosIcon)
 console.log('✓ ios AppIcon')
 
-// iOS Splash
+// iOS Splash — küçük logo, turkuaz arka plan
 const iosSplashDir = join(root, 'ios', 'App', 'App', 'Assets.xcassets', 'Splash.imageset')
 const iosSplash = join(iosSplashDir, 'splash-2732x2732.png')
-execSync(`sips -z 1200 1200 "${src}" --padColor ${BRAND_BG} --padToHeightWidth 2732 2732 --out "${iosSplash}"`, { stdio: 'pipe' })
+const iosLogoSize = Math.round(2732 * SPLASH_LOGO_RATIO)
+const iosLogoTmp = join(root, 'assets', '_splash_ios.png')
+execSync(`sips -z ${iosLogoSize} ${iosLogoSize} "${src}" --out "${iosLogoTmp}"`, { stdio: 'pipe' })
+execSync(`sips -z 2732 2732 "${iosLogoTmp}" --padColor ${BRAND_BG} --padToHeightWidth 2732 2732 --out "${iosSplash}"`, { stdio: 'pipe' })
+try { unlinkSync(iosLogoTmp) } catch {}
 cpSync(iosSplash, join(iosSplashDir, 'splash-2732x2732-1.png'))
 cpSync(iosSplash, join(iosSplashDir, 'splash-2732x2732-2.png'))
 console.log('✓ ios Splash')
@@ -68,7 +73,7 @@ for (const [rel, size] of splashSizes) {
   const dir = join(root, 'android', 'app', 'src', 'main', 'res', dirname(rel))
   const out = join(root, 'android', 'app', 'src', 'main', 'res', rel)
   mkdirSync(dir, { recursive: true })
-  const logoSize = Math.round(size * 0.55)
+  const logoSize = Math.round(size * SPLASH_LOGO_RATIO)
   const tmp = join(root, 'assets', '_splash_logo.png')
   execSync(`sips -z ${logoSize} ${logoSize} "${src}" --out "${tmp}"`, { stdio: 'pipe' })
   execSync(

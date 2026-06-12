@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const src = join(root, 'assets', 'logo.png')
 const outDir = join(root, 'public', 'icons')
-const BRAND_BG = '00B8D8' // logo turkuaz arka plan
+const BRAND_BG = '09DEFF' // logo turkuaz arka plan
 
 if (!existsSync(src)) {
   console.error('assets/logo.png bulunamadı.')
