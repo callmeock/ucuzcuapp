@@ -25,6 +25,11 @@ export default function NativeShell({ children }: { children: ReactNode }) {
         await SplashScreen.hide()
       } catch { /* web'de yok */ }
 
+      try {
+        const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
+        await Keyboard.setResizeMode({ mode: KeyboardResize.None })
+      } catch { /* web'de yok */ }
+
       const onClick = (e: MouseEvent) => {
         const anchor = (e.target as HTMLElement).closest('a')
         if (!anchor?.href) return

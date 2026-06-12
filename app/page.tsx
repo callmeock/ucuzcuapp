@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getProducts } from '@/lib/db'
 import { Product } from '@/lib/types'
 import Link from 'next/link'
-import Header from '@/components/Header'
+import { FixedLogoBar, SearchBar } from '@/components/Header'
 import CategoryFilter from '@/components/CategoryFilter'
 import ProductCard from '@/components/ProductCard'
 import ProductCardSkeleton from '@/components/ProductCardSkeleton'
@@ -154,9 +154,10 @@ export default function HomePage() {
 
   return (
     <>
-      <Header search={search} onSearch={setSearch} productCount={products.length} />
+      <FixedLogoBar productCount={products.length} />
 
       <div ref={scrollRef} className="content-scroll">
+        <SearchBar search={search} onSearch={setSearch} />
         <PullToRefresh onRefresh={handleRefresh} scrollRef={scrollRef}>
           <main className="max-w-6xl mx-auto px-4 pb-4">
           {showLocationBanner && (
