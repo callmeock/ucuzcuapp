@@ -4,6 +4,7 @@ import './globals.css'
 import { AuthProvider } from '@/lib/auth'
 import NativeShell from '@/components/NativeShell'
 import AppShell from '@/components/AppShell'
+import Analytics from '@/components/Analytics'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AppShell>{children}</AppShell>
           </NativeShell>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   )

@@ -14,7 +14,8 @@ export default function NativeShell({ children }: { children: ReactNode }) {
     const init = async () => {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
-        await StatusBar.setOverlaysWebView({ overlay: false })
+        // İçerik status bar altına uzansın — üstte beyaz boşluk kalmasın
+        await StatusBar.setOverlaysWebView({ overlay: true })
         await StatusBar.setStyle({ style: Style.Dark })
         await StatusBar.setBackgroundColor({ color: BRAND_COLOR })
       } catch { /* web'de yok */ }
@@ -24,7 +25,6 @@ export default function NativeShell({ children }: { children: ReactNode }) {
         await SplashScreen.hide()
       } catch { /* web'de yok */ }
 
-      // Harici linkler Safari'ye düşmesin — uygulama içinde kal
       const onClick = (e: MouseEvent) => {
         const anchor = (e.target as HTMLElement).closest('a')
         if (!anchor?.href) return
@@ -34,9 +34,7 @@ export default function NativeShell({ children }: { children: ReactNode }) {
           host === 'ucuzcuapp.com' ||
           host.endsWith('.ucuzcuapp.com') ||
           host === window.location.hostname
-        if (!allowed) {
-          e.preventDefault()
-        }
+        if (!allowed) e.preventDefault()
       }
       document.addEventListener('click', onClick, true)
 

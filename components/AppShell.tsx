@@ -12,7 +12,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className={showTabBar ? 'pb-tab-safe' : ''}>{children}</div>
+      <div key={pathname} className={`${showTabBar ? 'pb-tab-safe' : ''} page-enter`}>
+        {children}
+      </div>
       {showTabBar && <BottomTabBar />}
     </>
   )

@@ -12,7 +12,6 @@
   --primary-dark: #007A96;
 }
 
-/* Overscroll'da üstte beyaz çizgi kalmasın — html marka rengi */
 html {
   scroll-behavior: smooth;
   background-color: var(--brand);
@@ -23,7 +22,19 @@ body {
   min-height: 100dvh;
 }
 
-/* Capacitor / iOS notch & home indicator */
+/* Native: status bar alanı her zaman marka rengi */
+body.native-app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--brand);
+  z-index: 60;
+  pointer-events: none;
+}
+
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
@@ -32,19 +43,26 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Native Capacitor */
 html.native-app,
 body.native-app {
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Bottom tab bar için içerik boşluğu */
 .pb-tab-safe {
   padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
 }
 
-/* Skeleton pulse */
+/* Tab geçişleri — anlık his */
+.page-enter {
+  animation: page-fade-in 0.12s ease-out;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
@@ -54,7 +72,6 @@ body.native-app {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
-/* Scrollbar gizle */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

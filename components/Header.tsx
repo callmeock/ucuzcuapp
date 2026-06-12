@@ -29,9 +29,8 @@ export default function Header({ search, onSearch, productCount }: HeaderProps) 
   }, [])
 
   return (
-    <header className="bg-brand sticky top-0 z-40 shadow-md">
-      <div className="safe-top">
-        <div className="max-w-6xl mx-auto px-3 py-2 flex items-center gap-2">
+    <header className="bg-brand sticky top-0 z-40 shadow-md safe-top">
+      <div className="max-w-6xl mx-auto px-3 py-2 flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
             <img src="/logo.png" alt="Ucuzcu" className="w-9 h-9 rounded-lg object-cover shrink-0" />
             <div className="min-w-0 hidden min-[360px]:block">
@@ -65,7 +64,6 @@ export default function Header({ search, onSearch, productCount }: HeaderProps) 
             </button>
           </div>
         </div>
-      </div>
     </header>
   )
 }
