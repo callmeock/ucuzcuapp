@@ -123,18 +123,23 @@ export default function HomePage() {
     return counts
   }, [products, activeCategory])
 
-  // Infinite scroll — scroll container içinde
+  // Infinite scroll — mobil: scroll container, masaüstü: viewport
   useEffect(() => {
-    const root = scrollRef.current
     const el = sentinelRef.current
-    if (!el || !root || loading) return
+    if (!el || loading) return
+
+    const getRoot = () => {
+      if (window.matchMedia('(min-width: 1024px)').matches) return null
+      return scrollRef.current
+    }
+
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisibleCount((n) => Math.min(n + 50, filtered.length))
         }
       },
-      { root, rootMargin: '300px' }
+      { root: getRoot(), rootMargin: '300px' }
     )
     obs.observe(el)
     return () => obs.disconnect()
@@ -154,12 +159,12 @@ export default function HomePage() {
 
   return (
     <>
-      <FixedLogoBar productCount={products.length} />
+      <FixedLogoBar productCount={products.length} search={search} onSearch={setSearch} />
 
       <div ref={scrollRef} className="content-scroll">
         <SearchBar search={search} onSearch={setSearch} />
         <PullToRefresh onRefresh={handleRefresh} scrollRef={scrollRef}>
-          <main className="max-w-6xl mx-auto px-4 pb-4">
+          <main className="max-w-6xl lg:max-w-7xl mx-auto px-4 lg:px-6 pb-4 lg:pb-8">
           {showLocationBanner && (
             <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mt-3 mb-1">
               <span className="text-xl shrink-0">📍</span>
@@ -193,7 +198,7 @@ export default function HomePage() {
 
           <Link
             href="/brosurler"
-            className="flex items-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl px-4 py-3 mt-2 mb-1 hover:opacity-90 transition-opacity"
+            className="flex items-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl px-4 py-3 mt-2 mb-1 hover:opacity-90 transition-opacity lg:mt-4"
           >
             <span className="text-xl">🔥</span>
             <div className="flex-1 min-w-0">
@@ -203,15 +208,17 @@ export default function HomePage() {
             <span className="text-white/70 text-sm shrink-0">→</span>
           </Link>
 
-          <CategoryFilter
-            activeCategory={activeCategory}
-            activeSubcategory={activeSubcategory}
-            onCategoryChange={(cat) => { setActiveCategory(cat); setActiveSubcategory('Tümü') }}
-            onSubcategoryChange={setActiveSubcategory}
-            counts={categoryCounts}
-            subcategoryCounts={subcategoryCounts}
-          />
+          <div className="lg:flex lg:gap-6 lg:items-start lg:mt-2">
+            <CategoryFilter
+              activeCategory={activeCategory}
+              activeSubcategory={activeSubcategory}
+              onCategoryChange={(cat) => { setActiveCategory(cat); setActiveSubcategory('Tümü') }}
+              onSubcategoryChange={setActiveSubcategory}
+              counts={categoryCounts}
+              subcategoryCounts={subcategoryCounts}
+            />
 
+            <div className="flex-1 min-w-0">
           {search && !loading && (
             <div className="mb-3 text-sm text-gray-500">
               {filtered.length} sonuç: &ldquo;{search}&rdquo;
@@ -220,7 +227,7 @@ export default function HomePage() {
           )}
 
           {loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProductCardSkeleton key={i} />
               ))}
@@ -248,7 +255,7 @@ export default function HomePage() {
 
           {!loading && !error && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {visibleProducts.map((p) => (
                   <ProductCard
                     key={p.id}
@@ -266,6 +273,8 @@ export default function HomePage() {
               )}
             </>
           )}
+            </div>
+          </div>
           </main>
         </PullToRefresh>
       </div>
@@ -274,8 +283,7 @@ export default function HomePage() {
       {basketCount > 0 && (
         <button
           onClick={() => setBasketOpen(true)}
-          className="fixed right-4 z-40 bg-primary text-white rounded-full shadow-lg flex items-center gap-2 px-4 py-3 font-bold text-sm hover:bg-primary-dark transition-colors"
-          style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom) + 0.75rem)' }}
+          className="fixed right-4 z-40 bg-primary text-white rounded-full shadow-lg flex items-center gap-2 px-4 py-3 font-bold text-sm hover:bg-primary-dark transition-colors bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.75rem)] lg:bottom-6"
         >
           🛒 Sepet
           <span className="bg-white text-primary rounded-full w-6 h-6 flex items-center justify-center text-xs font-extrabold">

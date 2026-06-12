@@ -50,7 +50,7 @@ body.native-app {
   overscroll-behavior: none;
 }
 
-/* Logo şeridi altında kaydırılabilir alan (arama burada) */
+/* Logo şeridi altında kaydırılabilir alan (arama burada) — mobil/PWA */
 .content-scroll {
   position: fixed;
   left: 0;
@@ -76,6 +76,28 @@ body.native-app {
 
 .pb-tab-safe {
   padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+
+/* Masaüstü: normal sayfa kaydırması */
+@media (min-width: 1024px) {
+  html {
+    background-color: #f4f6fa;
+  }
+
+  .content-scroll,
+  .content-scroll-web {
+    position: static;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    overflow: visible;
+    overscroll-behavior-y: auto;
+  }
+
+  .pb-tab-safe {
+    padding-bottom: 0;
+  }
 }
 
 /* Tab geçişleri — anlık his */
