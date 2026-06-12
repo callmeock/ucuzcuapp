@@ -1,3 +1,5 @@
-/** Logo arka plan rengi — tüm marka yüzeyleri */
+/** Logo / header / splash arka planı */
 export const BRAND_COLOR = '#09DEFF'
-export const BRAND_COLOR_DARK = '#07B8D9'
+/** Butonlar, aktif chip'ler — beyaz üzerinde okunaklı */
+export const PRIMARY_COLOR = '#0099BB'
+export const PRIMARY_DARK = '#007A96'

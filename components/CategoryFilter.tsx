@@ -23,7 +23,6 @@ export default function CategoryFilter({
 
   return (
     <div className="py-2 space-y-1.5">
-      {/* Ana kategoriler */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {['Tümü', ...CATEGORIES].map((cat) => {
           const cfg = cat !== 'Tümü' ? (CATEGORY_CONFIG[cat] ?? null) : null
@@ -32,16 +31,16 @@ export default function CategoryFilter({
             <button
               key={cat}
               onClick={() => { onCategoryChange(cat); onSubcategoryChange('Tümü') }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap border-2 transition-all ${
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap border-2 transition-all ${
                 isActive
                   ? 'bg-primary border-primary text-white shadow-sm'
                   : 'bg-white border-gray-200 text-gray-700 hover:border-primary hover:text-primary'
               }`}
             >
-              {cfg && <span className="text-base leading-none">{cfg.emoji}</span>}
-              {cat}
+              {cfg && <span className="text-xl leading-none">{cfg.emoji}</span>}
+              <span className="text-xs font-semibold">{cat}</span>
               {counts && counts[cat] !== undefined && (
-                <span className={`text-xs ${isActive ? 'opacity-80' : 'opacity-50'}`}>
+                <span className={`text-[10px] font-medium ${isActive ? 'opacity-80' : 'opacity-50'}`}>
                   {counts[cat]}
                 </span>
               )}
@@ -50,7 +49,6 @@ export default function CategoryFilter({
         })}
       </div>
 
-      {/* Alt kategoriler — sadece bir ana kategori seçiliyse */}
       {subcategories.length > 0 && (
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
           <button

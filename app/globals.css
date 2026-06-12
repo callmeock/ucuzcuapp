@@ -7,17 +7,20 @@
   --a101: #dc2626;
   --bim: #2563eb;
   --sok: #7c3aed;
-  --primary: #09DEFF;
+  --brand: #09DEFF;
+  --primary: #0099BB;
+  --primary-dark: #007A96;
 }
 
+/* Overscroll'da üstte beyaz çizgi kalmasın — html marka rengi */
 html {
   scroll-behavior: smooth;
+  background-color: var(--brand);
 }
 
 body {
   background-color: #f4f6fa;
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  min-height: 100dvh;
 }
 
 /* Capacitor / iOS notch & home indicator */
@@ -29,14 +32,29 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Native Capacitor — tarayıcı çubuğu yok, tam ekran */
+/* Native Capacitor */
 html.native-app,
 body.native-app {
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Scrollbar gizle (category bar için) */
+/* Bottom tab bar için içerik boşluğu */
+.pb-tab-safe {
+  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+
+/* Skeleton pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Scrollbar gizle */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

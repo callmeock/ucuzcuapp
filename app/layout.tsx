@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth'
 import NativeShell from '@/components/NativeShell'
+import AppShell from '@/components/AppShell'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -42,7 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr">
       <body className={inter.className}>
         <AuthProvider>
-          <NativeShell>{children}</NativeShell>
+          <NativeShell>
+            <AppShell>{children}</AppShell>
+          </NativeShell>
         </AuthProvider>
       </body>
     </html>
