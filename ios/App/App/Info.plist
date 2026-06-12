@@ -57,10 +57,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.ucuzcu.app</string>
+			<string>com.ock.ucuzcu</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.ucuzcu.app</string>
+				<string>com.ock.ucuzcu</string>
 			</array>
 		</dict>
 	</array>

@@ -1,4 +1,4 @@
-package com.ucuzcu.app;
+package com.ock.ucuzcu;
 
 import com.getcapacitor.BridgeActivity;
 
