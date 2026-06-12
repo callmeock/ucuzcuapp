@@ -1,32 +1,38 @@
 'use client'
 
-import { ReactNode, useRef, useState, useCallback } from 'react'
+import { ReactNode, useRef, useState, useCallback, type RefObject } from 'react'
 import { isNativeApp } from '@/lib/capacitor'
 
 interface Props {
   onRefresh: () => Promise<void>
   children: ReactNode
+  scrollRef?: RefObject<HTMLElement | null>
 }
 
-export default function PullToRefresh({ onRefresh, children }: Props) {
+export default function PullToRefresh({ onRefresh, children, scrollRef }: Props) {
   const [pulling, setPulling] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const startY = useRef(0)
   const pullDistance = useRef(0)
 
+  const atTop = useCallback(() => {
+    if (scrollRef?.current) return scrollRef.current.scrollTop <= 0
+    return window.scrollY <= 0
+  }, [scrollRef])
+
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!isNativeApp() || window.scrollY > 0) return
+    if (!isNativeApp() || !atTop()) return
     startY.current = e.touches[0].clientY
-  }, [])
+  }, [atTop])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isNativeApp() || window.scrollY > 0 || refreshing) return
+    if (!isNativeApp() || !atTop() || refreshing) return
     const dy = e.touches[0].clientY - startY.current
     if (dy > 0 && dy < 120) {
       pullDistance.current = dy
       setPulling(dy > 60)
     }
-  }, [refreshing])
+  }, [atTop, refreshing])
 
   const onTouchEnd = useCallback(async () => {
     if (!isNativeApp() || !pulling || refreshing) {

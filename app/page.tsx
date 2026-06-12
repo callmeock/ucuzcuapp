@@ -24,6 +24,7 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(50)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const [location, setLocation] = useState<UserLocation | null>(null)
@@ -122,17 +123,18 @@ export default function HomePage() {
     return counts
   }, [products, activeCategory])
 
-  // Infinite scroll
+  // Infinite scroll — scroll container içinde
   useEffect(() => {
+    const root = scrollRef.current
     const el = sentinelRef.current
-    if (!el || loading) return
+    if (!el || !root || loading) return
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisibleCount((n) => Math.min(n + 50, filtered.length))
         }
       },
-      { rootMargin: '300px' }
+      { root, rootMargin: '300px' }
     )
     obs.observe(el)
     return () => obs.disconnect()
@@ -154,8 +156,9 @@ export default function HomePage() {
     <>
       <Header search={search} onSearch={setSearch} productCount={products.length} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
-        <main className="max-w-6xl mx-auto px-4 pb-4">
+      <div ref={scrollRef} className="content-scroll">
+        <PullToRefresh onRefresh={handleRefresh} scrollRef={scrollRef}>
+          <main className="max-w-6xl mx-auto px-4 pb-4">
           {showLocationBanner && (
             <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mt-3 mb-1">
               <span className="text-xl shrink-0">📍</span>
@@ -262,8 +265,9 @@ export default function HomePage() {
               )}
             </>
           )}
-        </main>
-      </PullToRefresh>
+          </main>
+        </PullToRefresh>
+      </div>
 
       {/* Sepet FAB */}
       {basketCount > 0 && (

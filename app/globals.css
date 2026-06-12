@@ -45,7 +45,32 @@ body.native-app::before {
 
 html.native-app,
 body.native-app {
-  overscroll-behavior-y: none;
+  overflow: hidden;
+  height: 100dvh;
+  overscroll-behavior: none;
+}
+
+/* Sabit header altında kaydırılabilir alan */
+.content-scroll {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top) + 3.5rem);
+  bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Web tarayıcıda (tab bar yok) */
+.content-scroll-web {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top) + 3.5rem);
+  bottom: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
 
