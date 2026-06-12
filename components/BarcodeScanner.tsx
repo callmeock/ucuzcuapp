@@ -144,7 +144,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/80">
+      <div className="flex items-center justify-between px-4 py-3 bg-black/80 safe-top">
         <button onClick={() => { stopCamera(); onClose() }} className="text-white p-2">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
@@ -208,7 +208,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       </div>
 
       {/* Alt: ipucu + manuel giriş */}
-      <div className="bg-gray-900 px-4 py-4">
+      <div className="bg-gray-900 px-4 py-4 safe-bottom">
         {status === 'scanning' && (
           <p className="text-gray-400 text-xs text-center mb-3">
             Barkodu çerçeve içine getir
@@ -221,7 +221,8 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
             placeholder="Barkod numarası (ör: 8690526040018)"
             value={manualCode}
             onChange={e => setManualCode(e.target.value)}
-            className="flex-1 bg-gray-800 text-white text-sm rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-green-500"
+            className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-green-500"
+            style={{ fontSize: '16px' }}
           />
           <button
             type="submit"

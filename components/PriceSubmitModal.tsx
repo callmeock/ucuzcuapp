@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/lib/auth'
 import {
-  getProductByBarcode, searchProductsByName, submitPrice,
+  getProductByBarcode, getAllProducts, submitPrice,
   getPendingSubmissionsByBarcode, voteSubmission,
 } from '@/lib/submissions'
 import { addGuestPoints, getGuestPoints } from '@/lib/points'
@@ -39,6 +39,8 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
   const [productName, setProductName] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [searching, setSearching] = useState(false)
+  const allProductsRef = useRef<Product[]>([])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [selectedMarket, setSelectedMarket] = useState<MarketName | ''>('')
   const [priceInput, setPriceInput] = useState('')
   const [error, setError] = useState('')
@@ -52,14 +54,16 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
   // Kazanılan toplam puan (submit + verify)
   const [earnedPoints, setEarnedPoints] = useState<number>(POINTS.SUBMIT)
 
-  // İlk yükleme: ürün + bekleyen bildirimler
+  // İlk yükleme: ürün + bekleyen bildirimler + ürün önbelleği
   useState(() => {
     const init = async () => {
       try {
-        const [found, pending] = await Promise.all([
+        const [found, pending, allProducts] = await Promise.all([
           getProductByBarcode(barcode),
           getPendingSubmissionsByBarcode(barcode),
+          getAllProducts(),
         ])
+        allProductsRef.current = allProducts
         if (found) {
           setProduct(found)
           setProductName(found.name)
@@ -83,13 +87,32 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
     setMarketPending(selectedMarket ? (pendingByMarket[selectedMarket] ?? null) : null)
   }, [selectedMarket, pendingByMarket])
 
-  const handleSearch = async () => {
-    if (productName.trim().length < 2) return
+  // Yazarken otomatik filtrele (debounce 300ms)
+  useEffect(() => {
+    if (product) return
+    const term = productName.trim()
+    if (term.length < 2) {
+      setSearchResults([])
+      setSearching(false)
+      return
+    }
     setSearching(true)
-    const results = await searchProductsByName(productName.trim())
-    setSearchResults(results)
-    setSearching(false)
-  }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const lower = term.toLowerCase()
+      const results = allProductsRef.current
+        .filter(p =>
+          p.name.toLowerCase().includes(lower) ||
+          (p.brand && typeof p.brand === 'string' && p.brand.toLowerCase().includes(lower))
+        )
+        .slice(0, 8)
+      setSearchResults(results)
+      setSearching(false)
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [productName, product])
 
   const selectProduct = (p: Product) => {
     setProduct(p)
@@ -206,41 +229,42 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
                 <>
                   <div>
                     <label className="text-sm font-medium text-gray-700 block mb-1.5">Ürün Adı</label>
-                    <div className="flex gap-2">
+                    <div className="relative">
                       <input
                         type="text"
                         value={productName}
                         onChange={e => setProductName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                        placeholder="Ürün adını yaz..."
-                        className="flex-1 border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        placeholder="Ürün adını yaz, otomatik aranır..."
+                        className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 pr-8"
+                        style={{ fontSize: '16px' }}
                       />
-                      <button
-                        onClick={handleSearch}
-                        disabled={searching}
-                        className="bg-gray-100 hover:bg-gray-200 px-3 rounded-xl text-sm font-medium transition-colors"
-                      >
-                        {searching ? '...' : 'Ara'}
-                      </button>
+                      {searching && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <span className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin block"/>
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {searchResults.length > 0 && (
-                    <div className="border rounded-xl overflow-hidden">
+                    <div className="border rounded-xl overflow-hidden shadow-sm">
                       {searchResults.map(r => (
                         <button
                           key={r.id}
                           onClick={() => selectProduct(r)}
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 border-b last:border-b-0 flex items-center justify-between"
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-green-50 border-b last:border-b-0 flex items-center justify-between gap-2 transition-colors"
                         >
-                          <span className="font-medium">{r.name}</span>
-                          <span className="text-xs text-gray-400">{r.category}</span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{r.name}</p>
+                            {r.brand && <p className="text-xs text-gray-400 truncate">{typeof r.brand === 'string' ? r.brand : (r.brand as any).name}</p>}
+                          </div>
+                          <span className="text-xs text-gray-400 shrink-0">{r.category}</span>
                         </button>
                       ))}
                     </div>
                   )}
 
-                  {searchResults.length === 0 && productName.trim().length > 2 && !searching && (
+                  {searchResults.length === 0 && productName.trim().length >= 2 && !searching && (
                     <p className="text-xs text-gray-500 text-center py-1">
                       Sistemde yok — yeni ürün olarak eklenir.
                     </p>

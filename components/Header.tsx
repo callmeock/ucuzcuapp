@@ -24,8 +24,8 @@ export default function Header({ search, onSearch, basketCount, onBasketOpen }: 
   }, [])
 
   return (
-    <header className="bg-primary sticky top-0 z-50 shadow-md">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+    <header className="bg-primary sticky top-0 z-50 shadow-md safe-top">
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-2 sm:gap-3">
         {/* Logo */}
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-2xl">🏷️</span>

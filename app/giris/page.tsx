@@ -114,7 +114,7 @@ export default function GirisPage() {
 
           <p className="text-center text-xs text-gray-400">
             Giriş yaparak{' '}
-            <span className="underline cursor-pointer">Kullanım Koşulları</span>'nı kabul etmiş olursun.
+            <Link href="/gizlilik" className="underline">Gizlilik Politikası</Link>'nı kabul etmiş olursun.
           </p>
 
           <div className="text-center">

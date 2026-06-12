@@ -18,6 +18,12 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
   return { id: snap.docs[0].id, ...snap.docs[0].data() } as Product
 }
 
+// ── Tüm ürünleri önbellekleme için getir (hafif — sadece arama alanları) ──
+export async function getAllProducts(): Promise<Product[]> {
+  const snap = await getDocs(collection(db, PROD_COL))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Product))
+}
+
 // ── İsme göre ürün ara (fuzzy olmayan, basit içerik araması) ──────
 export async function searchProductsByName(term: string): Promise<Product[]> {
   // Firestore full-text search olmadığından client-side filtre
