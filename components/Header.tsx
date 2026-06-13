@@ -108,7 +108,7 @@ export function FixedLogoBar({
       {/* ── Mobil: logo şeridi ── */}
       <div className="lg:hidden max-w-6xl mx-auto px-3 h-12 flex items-center gap-2">
         <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
-          <img src="/logo.png" alt="Ucuzcu" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+          <img src="/logo-v2.png" alt="Ucuzcu" className="w-8 h-8 rounded-lg object-cover shrink-0" />
           <div className="min-w-0">
             <span className="text-white font-extrabold text-base tracking-tight leading-none block">
               Ucuzcu
@@ -126,7 +126,7 @@ export function FixedLogoBar({
       <div className="hidden lg:block border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-5">
           <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <img src="/logo.png" alt="Ucuzcu" className="w-9 h-9 rounded-lg object-cover" />
+            <img src="/logo-v2.png" alt="Ucuzcu" className="w-9 h-9 rounded-lg object-cover" />
             <div>
               <span className="text-white font-extrabold text-lg tracking-tight leading-none block">
                 Ucuzcu
