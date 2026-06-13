@@ -63,6 +63,14 @@
 				<string>com.ock.ucuzcu</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Google Sign-In</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.245886804192-b16rlhdkssbai85om3kmmm2p5e36500n</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

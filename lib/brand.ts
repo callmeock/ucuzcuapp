@@ -1,5 +1,5 @@
 /** Logo / header / splash arka planı */
-export const BRAND_COLOR = '#09DEFF'
+export const BRAND_COLOR = '#FFAC09'
 /** Butonlar, aktif chip'ler — beyaz üzerinde okunaklı */
-export const PRIMARY_COLOR = '#0099BB'
-export const PRIMARY_DARK = '#007A96'
+export const PRIMARY_COLOR = '#E09600'
+export const PRIMARY_DARK = '#C07800'

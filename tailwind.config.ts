@@ -13,9 +13,9 @@ const config: Config = {
         a101: '#dc2626',
         bim: '#2563eb',
         sok: '#7c3aed',
-        brand: '#09DEFF',
-        primary: '#0099BB',
-        'primary-dark': '#007A96',
+        brand: '#FFAC09',
+        primary: '#E09600',
+        'primary-dark': '#C07800',
       },
       spacing: {
         tab: '3.5rem',

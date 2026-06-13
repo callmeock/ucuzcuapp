@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const src = join(root, 'assets', 'logo.png')
 const icon1024 = join(root, 'assets', 'icon.png')
-const BRAND_BG = '09DEFF'
+const BRAND_BG = 'FFAC09'
 const SPLASH_LOGO_RATIO = 0.28 // ekranın ~%28'i — çok büyük görünmesin
 
 if (!existsSync(src)) {
