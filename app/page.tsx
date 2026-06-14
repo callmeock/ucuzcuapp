@@ -20,6 +20,7 @@ export default function HomePage() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Tümü')
   const [activeSubcategory, setActiveSubcategory] = useState('Tümü')
+  const [activeMarket, setActiveMarket] = useState('Tümü')
   const [basket, setBasket] = useState<Basket>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [basketOpen, setBasketOpen] = useState(false)
@@ -92,12 +93,13 @@ export default function HomePage() {
     const result = products.filter((p) => {
       const matchCat = activeCategory === 'Tümü' || p.category === activeCategory
       const matchSub = activeSubcategory === 'Tümü' || p.subcategory === activeSubcategory
+      const matchMarket = activeMarket === 'Tümü' || p.prices.some((pr) => pr.market === activeMarket && pr.available)
       const matchQ =
         !q ||
         p.name.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q)
-      return matchCat && matchSub && matchQ
+      return matchCat && matchSub && matchMarket && matchQ
     })
     // Arama yoksa: en çok markette olan önce
     if (!q) {
@@ -106,7 +108,7 @@ export default function HomePage() {
     return result
   }, [products, search, activeCategory, activeSubcategory])
 
-  useEffect(() => { setVisibleCount(50) }, [search, activeCategory, activeSubcategory])
+  useEffect(() => { setVisibleCount(50) }, [search, activeCategory, activeSubcategory, activeMarket])
 
   const visibleProducts = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
 
@@ -127,6 +129,16 @@ export default function HomePage() {
       })
     return counts
   }, [products, activeCategory])
+
+  const marketCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    products.forEach((p) => {
+      p.prices.forEach((pr) => {
+        if (pr.available) counts[pr.market] = (counts[pr.market] || 0) + 1
+      })
+    })
+    return counts
+  }, [products])
 
   // Infinite scroll — mobil: scroll container, masaüstü: viewport
   useEffect(() => {
@@ -232,10 +244,13 @@ export default function HomePage() {
             <CategoryFilter
               activeCategory={activeCategory}
               activeSubcategory={activeSubcategory}
+              activeMarket={activeMarket}
               onCategoryChange={(cat) => { setActiveCategory(cat); setActiveSubcategory('Tümü') }}
               onSubcategoryChange={setActiveSubcategory}
+              onMarketChange={setActiveMarket}
               counts={categoryCounts}
               subcategoryCounts={subcategoryCounts}
+              marketCounts={marketCounts}
             />
 
             <div className="flex-1 min-w-0">
