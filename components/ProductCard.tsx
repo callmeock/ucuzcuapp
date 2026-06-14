@@ -33,7 +33,7 @@ export default function ProductCard({ product, basketQuantity, onClick, onAddToB
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-gray-100"
+      className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-gray-100 h-full"
     >
       {/* ── Mobil: kompakt kart ── */}
       <div className="flex gap-3 p-3 lg:hidden">
@@ -85,7 +85,7 @@ export default function ProductCard({ product, basketQuantity, onClick, onAddToB
       </div>
 
       {/* ── Desktop: tam kart ── */}
-      <div className="hidden lg:flex lg:flex-col">
+      <div className="hidden lg:flex lg:flex-col h-full">
         <div className="relative h-36 flex items-center justify-center" style={{ background: catCfg.bg }}>
           {product.image ? (
             <Image src={product.image} alt={product.name} fill className="object-contain p-4" sizes="33vw" />

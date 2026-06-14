@@ -19,6 +19,7 @@ function PriceChart({ priceData }: { priceData: MarketPrice }) {
     if (!ctx) return
 
     const history = priceData.history
+    if (!history || history.length === 0) return
     const color = MARKET_COLORS[priceData.market] || '#888'
     const dpr = window.devicePixelRatio || 1
     const rect = canvas.parentElement!.getBoundingClientRect()
@@ -90,9 +91,16 @@ function PriceChart({ priceData }: { priceData: MarketPrice }) {
     })
   }, [priceData])
 
+  const hasHistory = priceData.history && priceData.history.length > 0
+
   return (
     <div className="relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden w-full">
       <canvas ref={canvasRef} />
+      {!hasHistory && (
+        <div className="flex items-center justify-center h-16 text-sm text-gray-400">
+          Fiyat geçmişi yok
+        </div>
+      )}
     </div>
   )
 }
@@ -160,7 +168,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
             {product.prices.map((pr) => {
               const effPrice = effectivePrice(pr)
               const isCheapest = pr.available && effPrice === minPrice && available.length > 1
-              const color = MARKET_COLORS[pr.market]
+              const color = MARKET_COLORS[pr.market] || '#888'
               const campaign = pr.available ? pr.campaign : null
               const isDiscount = campaign?.type === 'discount'
               const isCashback = campaign?.type === 'cashback'
