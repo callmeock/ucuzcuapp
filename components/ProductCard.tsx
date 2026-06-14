@@ -164,7 +164,7 @@ export default function ProductCard({ product, basketQuantity, onClick, onAddToB
           </span>
           <button
             onClick={onAddToBasket}
-            className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${
               inBasket ? 'bg-green-500 text-white' : 'bg-primary text-white hover:bg-primary-dark'
             }`}
           >

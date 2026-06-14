@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Basket, BasketEntry, MARKET_COLORS } from '@/lib/types'
 
-const MARKETS = ['Migros', 'A101', 'BİM', 'Şok'] as const
+const MARKETS = ['Migros', 'A101', 'Şok', 'Getir', 'Yemeksepeti'] as const
 type MarketName = typeof MARKETS[number]
 type ViewMode = 'cheapest' | MarketName
 

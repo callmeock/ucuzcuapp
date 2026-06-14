@@ -52,6 +52,8 @@ export const MARKET_COLORS: Record<string, string> = {
   A101: '#dc2626',
   'BİM': '#2563eb',
   'Şok': '#7c3aed',
+  'Getir': '#5D3EBC',
+  'Yemeksepeti': '#FA0050',
 }
 
 export const CATEGORIES = [

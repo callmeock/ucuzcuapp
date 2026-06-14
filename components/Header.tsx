@@ -115,7 +115,7 @@ export function FixedLogoBar({
             </span>
             {productCount != null && productCount > 0 && (
               <span className="text-white/75 text-[10px] font-medium leading-tight">
-                {productCount.toLocaleString('tr-TR')} ürün · 4 market
+                {productCount.toLocaleString('tr-TR')} ürün · 5 market
               </span>
             )}
           </div>
@@ -133,7 +133,7 @@ export function FixedLogoBar({
               </span>
               {productCount != null && productCount > 0 && (
                 <span className="text-white/70 text-[11px] font-medium">
-                  {productCount.toLocaleString('tr-TR')} ürün · 4 market
+                  {productCount.toLocaleString('tr-TR')} ürün · 5 market
                 </span>
               )}
             </div>
