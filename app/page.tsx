@@ -89,7 +89,7 @@ export default function HomePage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return products.filter((p) => {
+    const result = products.filter((p) => {
       const matchCat = activeCategory === 'Tümü' || p.category === activeCategory
       const matchSub = activeSubcategory === 'Tümü' || p.subcategory === activeSubcategory
       const matchQ =
@@ -99,6 +99,11 @@ export default function HomePage() {
         p.category.toLowerCase().includes(q)
       return matchCat && matchSub && matchQ
     })
+    // Arama yoksa: en çok markette olan önce
+    if (!q) {
+      result.sort((a, b) => (b.prices?.length ?? 0) - (a.prices?.length ?? 0))
+    }
+    return result
   }, [products, search, activeCategory, activeSubcategory])
 
   useEffect(() => { setVisibleCount(50) }, [search, activeCategory, activeSubcategory])
