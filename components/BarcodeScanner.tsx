@@ -8,7 +8,6 @@ import {
   RGBLuminanceSource,
   BinaryBitmap,
   HybridBinarizer,
-  NotFoundException,
 } from '@zxing/library'
 
 interface BarcodeScannerProps {
@@ -16,109 +15,97 @@ interface BarcodeScannerProps {
   onClose: () => void
 }
 
-function isIOS(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return /iPad|iPhone|iPod/.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-}
-
 function createReader() {
-  const hints = new Map()
+  const hints = new Map<DecodeHintType, unknown>()
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-    BarcodeFormat.EAN_13,
-    BarcodeFormat.EAN_8,
     BarcodeFormat.UPC_A,
     BarcodeFormat.UPC_E,
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
     BarcodeFormat.CODE_128,
     BarcodeFormat.CODE_39,
     BarcodeFormat.QR_CODE,
   ])
   hints.set(DecodeHintType.TRY_HARDER, true)
+  // @ts-expect-error ALSO_INVERTED bazı sürümlerde var
+  if (DecodeHintType.ALSO_INVERTED != null) {
+    // @ts-expect-error
+    hints.set(DecodeHintType.ALSO_INVERTED, true)
+  }
   const reader = new MultiFormatReader()
   reader.setHints(hints)
   return reader
 }
 
-function luminancesFromImageData(imageData: ImageData): Uint8ClampedArray {
-  const { data, width, height } = imageData
-  const luminances = new Uint8ClampedArray(width * height)
-  for (let i = 0; i < width * height; i++) {
+function rgbaToLuminance(data: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+  const lum = new Uint8ClampedArray(w * h)
+  for (let i = 0; i < w * h; i++) {
     const o = i * 4
-    luminances[i] = (data[o] * 0.299 + data[o + 1] * 0.587 + data[o + 2] * 0.114) | 0
+    lum[i] = (data[o] * 0.299 + data[o + 1] * 0.587 + data[o + 2] * 0.114) | 0
   }
-  return luminances
+  return lum
 }
 
-function decodeLuminance(reader: MultiFormatReader, luminances: Uint8ClampedArray, w: number, h: number): string | null {
+function rotateLum90CW(lum: Uint8ClampedArray, w: number, h: number) {
+  const out = new Uint8ClampedArray(w * h)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      out[x * h + (h - 1 - y)] = lum[y * w + x]
+    }
+  }
+  return { lum: out, w: h, h: w }
+}
+
+function tryDecode(reader: MultiFormatReader, lum: Uint8ClampedArray, w: number, h: number): string | null {
   try {
-    const source = new RGBLuminanceSource(luminances, w, h)
+    const source = new RGBLuminanceSource(lum, w, h)
     const bitmap = new BinaryBitmap(new HybridBinarizer(source))
-    const result = reader.decodeWithState(bitmap)
+    const result = reader.decode(bitmap)
     reader.reset()
     return result.getText()
-  } catch (e) {
-    reader.reset()
-    if (!(e instanceof NotFoundException)) {
-      /* ignore other decode errors */
-    }
+  } catch {
+    try { reader.reset() } catch { /* ignore */ }
     return null
   }
 }
 
-/** 0° + 90° + 270° — dikey kutu barkodları için */
-function decodeCanvas(reader: MultiFormatReader, canvas: HTMLCanvasElement): string | null {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return null
-  const w = canvas.width
-  const h = canvas.height
-
-  let text = decodeLuminance(reader, luminancesFromImageData(ctx.getImageData(0, 0, w, h)), w, h)
-  if (text) return text
-
-  const rot = document.createElement('canvas')
-  rot.width = h
-  rot.height = w
-  const rctx = rot.getContext('2d', { willReadFrequently: true })
-  if (!rctx) return null
-
-  for (const angle of [90, -90] as const) {
-    rctx.clearRect(0, 0, h, w)
-    rctx.save()
-    if (angle === 90) {
-      rctx.translate(h, 0)
-      rctx.rotate(Math.PI / 2)
-    } else {
-      rctx.translate(0, w)
-      rctx.rotate(-Math.PI / 2)
-    }
-    rctx.drawImage(canvas, 0, 0)
-    rctx.restore()
-    text = decodeLuminance(reader, luminancesFromImageData(rctx.getImageData(0, 0, h, w)), h, w)
-    if (text) return text
+/** Tam kare + 3 rotasyon. Statik testte tam kare UPC-A okuyor. */
+function decodeImageData(reader: MultiFormatReader, imageData: ImageData): string | null {
+  let cur = {
+    lum: rgbaToLuminance(imageData.data, imageData.width, imageData.height),
+    w: imageData.width,
+    h: imageData.height,
+  }
+  for (let i = 0; i < 4; i++) {
+    const text = tryDecode(reader, cur.lum, cur.w, cur.h)
+    if (text) return text.replace(/\D/g, '') || text
+    cur = rotateLum90CW(cur.lum, cur.w, cur.h)
   }
   return null
 }
 
 export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const rafRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const detectedRef = useRef(false)
+  const readerRef = useRef<MultiFormatReader | null>(null)
   const [status, setStatus] = useState<'starting' | 'scanning' | 'error'>('starting')
   const [errorMsg, setErrorMsg] = useState('')
   const [manualCode, setManualCode] = useState('')
   const [torchOn, setTorchOn] = useState(false)
-  const [engine, setEngine] = useState('')
+  const [hint, setHint] = useState('Barkodu yakından, net göster')
 
   const finish = useCallback((code: string) => {
     if (detectedRef.current) return
+    const cleaned = code.replace(/\D/g, '')
+    if (cleaned.length < 6) return
     detectedRef.current = true
-    onDetected(code)
+    onDetected(cleaned)
   }, [onDetected])
 
   const stopCamera = useCallback(() => {
-    cancelAnimationFrame(rafRef.current)
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -129,125 +116,74 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
     }
   }, [])
 
-  const startZxingLoop = useCallback(async () => {
-    setEngine('ZXing')
-    try {
-      const reader = createReader()
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      })
-      streamRef.current = stream
-      const video = videoRef.current!
-      video.srcObject = stream
-      video.setAttribute('playsinline', 'true')
-      await video.play()
-      setStatus('scanning')
+  useEffect(() => {
+    const reader = createReader()
+    readerRef.current = reader
+    const canvas = document.createElement('canvas')
 
-      const canvas = document.createElement('canvas')
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        })
+        streamRef.current = stream
+        const video = videoRef.current!
+        video.srcObject = stream
+        video.setAttribute('playsinline', 'true')
+        video.muted = true
+        await video.play()
+        setStatus('scanning')
 
-      timerRef.current = setInterval(() => {
-        if (detectedRef.current) return
-        if (video.readyState < 2) return
-        const vw = video.videoWidth
-        const vh = video.videoHeight
-        if (!vw || !vh) return
+        let ticks = 0
+        timerRef.current = setInterval(() => {
+          if (detectedRef.current) return
+          if (video.readyState < 2) return
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          if (!vw || !vh) return
 
-        // Ortadaki geniş alan
-        const cropW = Math.floor(vw * 0.9)
-        const cropH = Math.floor(vh * 0.55)
-        const sx = Math.floor((vw - cropW) / 2)
-        const sy = Math.floor((vh - cropH) / 2)
+          // Performans: uzun kenarı max 1280
+          const scale = Math.min(1, 1280 / Math.max(vw, vh))
+          const tw = Math.floor(vw * scale)
+          const th = Math.floor(vh * scale)
+          canvas.width = tw
+          canvas.height = th
+          const ctx = canvas.getContext('2d', { willReadFrequently: true })
+          if (!ctx) return
+          ctx.drawImage(video, 0, 0, tw, th)
 
-        canvas.width = cropW
-        canvas.height = cropH
-        const ctx = canvas.getContext('2d', { willReadFrequently: true })
-        if (!ctx) return
-        ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cropW, cropH)
-
-        const text = decodeCanvas(reader, canvas)
-        if (text) {
-          stopCamera()
-          // Sadece rakamlar — boşluk/çizgi olmasın
-          finish(text.replace(/\D/g, '') || text)
-        }
-      }, 280)
-    } catch (err: unknown) {
-      const e = err as { name?: string; message?: string }
-      if (e.name === 'NotAllowedError') {
-        setErrorMsg('Kamera izni gerekli. Safari → Ayarlar → ucuzcuapp.com → Kamera → İzin Ver')
-      } else {
-        setErrorMsg('Kamera açılamadı: ' + (e.message || 'Bilinmeyen hata'))
-      }
-      setStatus('error')
-    }
-  }, [finish, stopCamera])
-
-  const startNative = useCallback(async () => {
-    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector
-    if (typeof BD !== 'function') return false
-    if (isIOS()) return false
-
-    let detector: { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> }
-    try {
-      detector = new BD({
-        formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'],
-      })
-    } catch {
-      return false
-    }
-
-    try {
-      setEngine('Native')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-      setStatus('scanning')
-
-      const scan = () => {
-        if (detectedRef.current) return
-        const video = videoRef.current
-        if (!video || video.readyState < 2) {
-          rafRef.current = requestAnimationFrame(scan)
-          return
-        }
-        detector.detect(video).then((barcodes) => {
-          if (barcodes.length > 0) {
+          // Tam kare — kırpma YOK (statik testte tam kare çalıştı)
+          const text = decodeImageData(reader, ctx.getImageData(0, 0, tw, th))
+          if (text) {
             stopCamera()
-            finish(barcodes[0].rawValue)
-          } else {
-            rafRef.current = requestAnimationFrame(scan)
+            finish(text)
+            return
           }
-        }).catch(() => { rafRef.current = requestAnimationFrame(scan) })
-      }
-      scan()
-      return true
-    } catch (err: unknown) {
-      const e = err as { name?: string }
-      if (e.name === 'NotAllowedError') {
-        setErrorMsg('Kamera izni gerekli.')
+
+          ticks++
+          if (ticks === 12) setHint('Daha yaklaş · barkod çerçeveyi doldursun')
+          if (ticks === 30) setHint('Yansımayı kes · kutuyu hafif eğ')
+          if (ticks === 50) setHint('Olmazsa alttan fotoğraf seç veya elle yaz')
+        }, 400)
+      } catch (err: unknown) {
+        const e = err as { name?: string; message?: string }
+        if (e.name === 'NotAllowedError') {
+          setErrorMsg('Kamera izni gerekli. Ayarlardan izin ver.')
+        } else {
+          setErrorMsg(e.message || 'Kamera açılamadı')
+        }
         setStatus('error')
       }
-      return false
     }
-  }, [finish, stopCamera])
 
-  useEffect(() => {
-    const init = async () => {
-      const ok = await startNative()
-      if (!ok && !detectedRef.current) await startZxingLoop()
-    }
-    init()
+    start()
     return () => stopCamera()
-  }, [startNative, startZxingLoop, stopCamera])
+  }, [finish, stopCamera])
 
   const toggleTorch = async () => {
     const track = streamRef.current?.getVideoTracks()[0]
@@ -255,14 +191,43 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
     try {
       await track.applyConstraints({ advanced: [{ torch: !torchOn } as MediaTrackConstraintSet] })
       setTorchOn(!torchOn)
-    } catch { /* yok */ }
+    } catch { /* destek yok */ }
   }
 
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (manualCode.trim().length >= 4) {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setHint('Fotoğraf okunuyor...')
+    try {
+      const bitmap = await createImageBitmap(file)
+      const canvas = document.createElement('canvas')
+      // yüksek çözünürlük koru ama max 2000
+      const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height))
+      canvas.width = Math.floor(bitmap.width * scale)
+      canvas.height = Math.floor(bitmap.height * scale)
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      const reader = readerRef.current || createReader()
+      const text = decodeImageData(reader, ctx.getImageData(0, 0, canvas.width, canvas.height))
+      bitmap.close()
+      if (text) {
+        stopCamera()
+        finish(text)
+      } else {
+        setHint('Fotoğrafta barkod bulunamadı — daha net çek veya elle yaz')
+      }
+    } catch {
+      setHint('Fotoğraf okunamadı')
+    }
+    e.target.value = ''
+  }
+
+  const handleManualSubmit = (ev: React.FormEvent) => {
+    ev.preventDefault()
+    const code = manualCode.replace(/\D/g, '')
+    if (code.length >= 6) {
       stopCamera()
-      finish(manualCode.trim())
+      finish(code)
     }
   }
 
@@ -274,10 +239,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
-        <div className="text-center">
-          <span className="text-white font-semibold">Barkod Tara</span>
-          {engine && <div className="text-xs text-green-400 mt-0.5">{engine}</div>}
-        </div>
+        <span className="text-white font-semibold">Barkod Tara</span>
         {status === 'scanning' ? (
           <button type="button" onClick={toggleTorch} className="text-white p-2" aria-label="Flaş">
             <svg className="w-6 h-6" fill={torchOn ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
@@ -292,16 +254,10 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
         {status === 'scanning' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="absolute inset-0 bg-black/40" style={{
-              clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, 12% 18%, 12% 82%, 88% 82%, 88% 18%, 12% 18%)',
-            }} />
-            <div className="relative w-56 h-72">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl-sm"/>
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr-sm"/>
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl-sm"/>
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br-sm"/>
-              <div className="absolute inset-x-0 top-0 h-0.5 bg-green-400 opacity-80"
-                style={{ animation: 'scanline 2.2s ease-in-out infinite' }}/>
+            <div className="relative w-64 h-64 border-2 border-green-400/80 rounded-2xl">
+              <div className="absolute -top-8 inset-x-0 text-center text-white text-xs font-medium drop-shadow">
+                {hint}
+              </div>
             </div>
           </div>
         )}
@@ -317,26 +273,30 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
         {status === 'error' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6">
-            <div className="text-center text-white">
-              <div className="text-5xl mb-4">📷</div>
-              <p className="text-sm text-red-400 font-semibold mb-2">Kamera Açılamadı</p>
+            <div className="text-center text-white space-y-3">
+              <p className="text-sm text-red-400 font-semibold">Kamera Açılamadı</p>
               <p className="text-xs text-gray-300">{errorMsg}</p>
+              <p className="text-xs text-gray-400">Fotoğraf seçerek veya elle yazarak devam edebilirsin.</p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="bg-gray-900 px-4 py-4 safe-bottom">
-        {status === 'scanning' && (
-          <p className="text-gray-400 text-xs text-center mb-3 leading-relaxed">
-            Barkodu çerçeveye dik getir · kutuyu düz tut · yansımayı azaltmak için hafif eğin
-          </p>
-        )}
+      <div className="bg-gray-900 px-4 py-4 safe-bottom space-y-3">
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="w-full bg-gray-800 hover:bg-gray-750 border border-gray-700 text-white rounded-xl py-3 text-sm font-semibold"
+        >
+          Galeriden / fotoğraftan oku
+        </button>
+
         <form onSubmit={handleManualSubmit} className="flex gap-2">
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Elle yaz: 04963406"
+            placeholder="Elle yaz (ör: 04963406)"
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
             className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-green-500"
@@ -344,21 +304,13 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
           />
           <button
             type="submit"
-            disabled={manualCode.trim().length < 4}
-            className="bg-green-500 disabled:bg-gray-700 text-white px-4 rounded-xl font-semibold text-sm transition-colors"
+            disabled={manualCode.replace(/\D/g, '').length < 6}
+            className="bg-green-500 disabled:bg-gray-700 text-white px-4 rounded-xl font-semibold text-sm"
           >
             Ara
           </button>
         </form>
       </div>
-
-      <style jsx>{`
-        @keyframes scanline {
-          0%   { transform: translateY(0px); opacity: 1; }
-          50%  { transform: translateY(260px); opacity: 0.7; }
-          100% { transform: translateY(0px); opacity: 1; }
-        }
-      `}</style>
     </div>
   )
 }
