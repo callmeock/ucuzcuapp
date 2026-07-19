@@ -35,6 +35,7 @@ export interface Product {
   subcategory?: string | null
   unit: string
   barcode: string | null
+  barcodes?: string[]     // alternatif barkod formatları (UPC-E / UPC-A vb.)
   image?: string | null   // URL veya null (null ise kategori emojisi gösterilir)
   prices: MarketPrice[]
   createdAt?: Date

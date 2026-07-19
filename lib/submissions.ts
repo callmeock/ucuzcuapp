@@ -10,12 +10,64 @@ const SUB_COL  = 'price_submissions'
 const PROD_COL = 'products'
 const USER_COL = 'users'
 
+/** UPC-E ↔ UPC-A gibi yaygın varyantlar */
+function barcodeVariants(raw: string): string[] {
+  const c = String(raw || '').replace(/\D/g, '')
+  const out = new Set<string>()
+  if (!c) return []
+  out.add(c)
+  out.add(raw.trim())
+
+  // UPC-E (8 hane) → UPC-A (12 hane)
+  if (c.length === 8 && (c[0] === '0' || c[0] === '1')) {
+    const ns = c[0]
+    const d = c.slice(1, 7) // ABCDEF
+    const chk = c[7]
+    const F = d[5]
+    let mfr = ''
+    let item = ''
+    if (F === '0' || F === '1' || F === '2') {
+      mfr = d[0] + d[1] + F + '00'
+      item = '00' + d[2] + d[3] + d[4]
+    } else if (F === '3') {
+      mfr = d[0] + d[1] + d[2] + '00'
+      item = '000' + d[3] + d[4]
+    } else if (F === '4') {
+      mfr = d[0] + d[1] + d[2] + d[3] + '0'
+      item = '0000' + d[4]
+    } else {
+      mfr = d.slice(0, 5)
+      item = '0000' + F
+    }
+    out.add(ns + mfr + item + chk)
+  }
+
+  // 12 haneli UPC-A başında 0 yoksa bazen 13 hane EAN olarak gelir
+  if (c.length === 12) out.add('0' + c)
+  if (c.length === 13 && c.startsWith('0')) out.add(c.slice(1))
+
+  return [...out]
+}
+
 // ── Barkod ile ürün bul ───────────────────────────────────────────
 export async function getProductByBarcode(barcode: string): Promise<Product | null> {
-  const q = query(collection(db, PROD_COL), where('barcode', '==', barcode))
-  const snap = await getDocs(q)
-  if (snap.empty) return null
-  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Product
+  const variants = barcodeVariants(barcode)
+  for (const v of variants) {
+    const q = query(collection(db, PROD_COL), where('barcode', '==', v))
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      return { id: snap.docs[0].id, ...snap.docs[0].data() } as Product
+    }
+  }
+  // barcodes[] dizisinde ara (alternatif formatlar)
+  for (const v of variants) {
+    const q = query(collection(db, PROD_COL), where('barcodes', 'array-contains', v))
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      return { id: snap.docs[0].id, ...snap.docs[0].data() } as Product
+    }
+  }
+  return null
 }
 
 // ── Tüm ürünleri önbellekleme için getir (hafif — sadece arama alanları) ──
