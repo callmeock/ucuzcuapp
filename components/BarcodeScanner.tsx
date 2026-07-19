@@ -63,6 +63,25 @@ function toLum(data: Uint8ClampedArray, w: number, h: number) {
   return lum
 }
 
+function autocontrast(lum: Uint8ClampedArray): Uint8ClampedArray {
+  let min = 255, max = 0
+  for (let i = 0; i < lum.length; i++) {
+    if (lum[i] < min) min = lum[i]
+    if (lum[i] > max) max = lum[i]
+  }
+  if (max <= min) return lum
+  const out = new Uint8ClampedArray(lum.length)
+  const scale = 255 / (max - min)
+  for (let i = 0; i < lum.length; i++) out[i] = ((lum[i] - min) * scale) | 0
+  return out
+}
+
+function invertLum(lum: Uint8ClampedArray): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(lum.length)
+  for (let i = 0; i < lum.length; i++) out[i] = 255 - lum[i]
+  return out
+}
+
 function rotate90(lum: Uint8ClampedArray, w: number, h: number) {
   const out = new Uint8ClampedArray(w * h)
   for (let y = 0; y < h; y++) {
@@ -73,25 +92,91 @@ function rotate90(lum: Uint8ClampedArray, w: number, h: number) {
   return { lum: out, w: h, h: w }
 }
 
-function decodeCanvas(canvas: HTMLCanvasElement): string | null {
+function tryDecodeLum(reader: MultiFormatReader, lum: Uint8ClampedArray, w: number, h: number): string | null {
+  const variants = [lum, autocontrast(lum), invertLum(lum), invertLum(autocontrast(lum))]
+  for (const v of variants) {
+    let cur = { lum: v, w, h }
+    for (let r = 0; r < 4; r++) {
+      try {
+        const source = new RGBLuminanceSource(cur.lum, cur.w, cur.h)
+        const bitmap = new BinaryBitmap(new HybridBinarizer(source))
+        const result = reader.decode(bitmap)
+        reader.reset()
+        const text = result.getText().replace(/\D/g, '')
+        if (text.length >= 6) return text
+      } catch {
+        try { reader.reset() } catch { /* ignore */ }
+      }
+      cur = rotate90(cur.lum, cur.w, cur.h)
+    }
+  }
+  return null
+}
+
+function cropCanvas(
+  src: HTMLCanvasElement,
+  nx: number, ny: number, nw: number, nh: number,
+): HTMLCanvasElement {
+  const x = Math.floor(src.width * nx)
+  const y = Math.floor(src.height * ny)
+  const w = Math.floor(src.width * nw)
+  const h = Math.floor(src.height * nh)
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  c.getContext('2d')!.drawImage(src, x, y, w, h, 0, 0, w, h)
+  return c
+}
+
+function scaleCanvas(src: HTMLCanvasElement, maxSide: number): HTMLCanvasElement {
+  const scale = Math.min(1, maxSide / Math.max(src.width, src.height))
+  if (scale >= 0.99) return src
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.floor(src.width * scale))
+  c.height = Math.max(1, Math.floor(src.height * scale))
+  c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height)
+  return c
+}
+
+function upscaleCanvas(src: HTMLCanvasElement, factor: number): HTMLCanvasElement {
+  const c = document.createElement('canvas')
+  c.width = Math.floor(src.width * factor)
+  c.height = Math.floor(src.height * factor)
+  const ctx = c.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(src, 0, 0, c.width, c.height)
+  return c
+}
+
+/** Agresif decode: tam kare + merkez kırpma + ölçek + kontrast */
+function decodePhoto(canvas: HTMLCanvasElement): string | null {
+  const reader = createZxingReader()
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return null
-  const reader = createZxingReader()
-  const { width: w, height: h } = canvas
-  let cur = { lum: toLum(ctx.getImageData(0, 0, w, h).data, w, h), w, h }
 
-  for (let r = 0; r < 4; r++) {
-    try {
-      const source = new RGBLuminanceSource(cur.lum, cur.w, cur.h)
-      const bitmap = new BinaryBitmap(new HybridBinarizer(source))
-      const result = reader.decode(bitmap)
-      reader.reset()
-      const text = result.getText().replace(/\D/g, '')
-      if (text.length >= 6) return text
-    } catch {
-      try { reader.reset() } catch { /* ignore */ }
-    }
-    cur = rotate90(cur.lum, cur.w, cur.h)
+  const attempts: HTMLCanvasElement[] = [
+    canvas,
+    scaleCanvas(canvas, 1280),
+    scaleCanvas(canvas, 800),
+    cropCanvas(canvas, 0.1, 0.2, 0.8, 0.6),
+    cropCanvas(canvas, 0.15, 0.25, 0.7, 0.5),
+    cropCanvas(canvas, 0.2, 0.3, 0.6, 0.4),
+    cropCanvas(canvas, 0.05, 0.15, 0.9, 0.7),
+  ]
+
+  // Merkez dikey şerit (kutu barkodu)
+  attempts.push(cropCanvas(canvas, 0.3, 0.1, 0.4, 0.8))
+  attempts.push(cropCanvas(canvas, 0.35, 0.15, 0.3, 0.7))
+
+  for (const c of attempts) {
+    const boosted = upscaleCanvas(c, c.width < 600 ? 2 : 1)
+    const lum = toLum(
+      boosted.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, boosted.width, boosted.height).data,
+      boosted.width,
+      boosted.height,
+    )
+    const hit = tryDecodeLum(reader, lum, boosted.width, boosted.height)
+    if (hit) return hit
   }
   return null
 }
@@ -282,35 +367,27 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
 
       setStatusText('Okunuyor…')
 
-      // 1) ZXing tam kare + rotasyon
-      let code = decodeCanvas(canvas)
+      // Agresif decode (kırpma + kontrast + rotasyon)
+      let code = decodePhoto(canvas)
 
-      // 2) Küçültülmüş kopya (bazen daha iyi)
-      if (!code && canvas.width > 1000) {
-        const small = document.createElement('canvas')
-        const scale = 1000 / canvas.width
-        small.width = Math.floor(canvas.width * scale)
-        small.height = Math.floor(canvas.height * scale)
-        small.getContext('2d')!.drawImage(canvas, 0, 0, small.width, small.height)
-        code = decodeCanvas(small)
-      }
-
-      // 3) html5-qrcode scanFile yedek
+      // html5-qrcode yedek
       if (!code && blob) {
         try {
           const file = new File([blob], 'shot.jpg', { type: 'image/jpeg' })
-          const tmpId = 'ucuzcu-shot-decode'
-          let el = document.getElementById(tmpId)
+          let el = document.getElementById('ucuzcu-shot-decode')
           if (!el) {
             el = document.createElement('div')
-            el.id = tmpId
+            el.id = 'ucuzcu-shot-decode'
             el.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px'
             document.body.appendChild(el)
           }
-          const s = new Html5Qrcode(tmpId, { verbose: false, formatsToSupport: FORMATS })
-          const text = await s.scanFile(file, false)
-          try { s.clear() } catch { /* ignore */ }
-          code = text.replace(/\D/g, '')
+          const s = new Html5Qrcode('ucuzcu-shot-decode', { verbose: false, formatsToSupport: FORMATS })
+          try {
+            const text = await s.scanFile(file, false)
+            code = text.replace(/\D/g, '')
+          } finally {
+            try { s.clear() } catch { /* ignore */ }
+          }
         } catch { /* ignore */ }
       }
 
@@ -320,7 +397,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
         return
       }
 
-      setStatusText('Bu karede barkod yok — yaklaş, netle, tekrar çek')
+      setStatusText('Okuyamadım — yaklaştırıp tekrar çek')
     } finally {
       setBusy(false)
     }
@@ -340,7 +417,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       canvas.height = bmp.height
       canvas.getContext('2d')!.drawImage(bmp, 0, 0)
       bmp.close()
-      let code = decodeCanvas(canvas)
+      let code = decodePhoto(canvas)
       if (!code) {
         let el = document.getElementById('ucuzcu-shot-decode')
         if (!el) {
@@ -361,7 +438,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
         setStatusText(`Bulundu: ${code}`)
         await finish(code)
       } else {
-        setStatusText('Fotoğrafta barkod bulunamadı')
+        setStatusText('Okuyamadım — daha net bir fotoğraf dene')
       }
     } catch {
       setStatusText('Fotoğraf okunamadı')
@@ -396,14 +473,11 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       <div className="relative flex-1 min-h-0 bg-black">
         <div id={READER_ID} className="ucuzcu-reader absolute inset-0" />
 
-        {/* Çekilen fotoğraf önizlemesi */}
+        {/* Çekilen fotoğraf — mesaj üstüne basılmaz */}
         {previewUrl && (
-          <div className="absolute inset-0 z-20 bg-black flex flex-col">
+          <div className="absolute inset-0 z-20 bg-black flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="Çekilen kare" className="flex-1 object-contain w-full" />
-            {statusText && (
-              <p className="absolute bottom-4 inset-x-0 text-center text-white text-sm bg-black/60 py-2">{statusText}</p>
-            )}
+            <img src={previewUrl} alt="Çekilen kare" className="max-w-full max-h-full object-contain" />
           </div>
         )}
 
@@ -422,8 +496,12 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       </div>
 
       <div className="relative z-40 bg-gray-950 px-4 pt-3 pb-4 safe-bottom space-y-3 border-t border-white/10">
-        {!previewUrl && statusText && (
-          <p className="text-center text-xs text-amber-300">{statusText}</p>
+        {statusText && (
+          <p className={`text-center text-sm font-medium ${
+            statusText.startsWith('Bulundu') ? 'text-green-400' : statusText === 'Okunuyor…' ? 'text-white/70' : 'text-amber-300'
+          }`}>
+            {statusText}
+          </p>
         )}
 
         {previewUrl ? (
