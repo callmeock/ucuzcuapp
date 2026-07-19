@@ -55,32 +55,34 @@ export default function PriceSubmitModal({ barcode, onClose, onSuccess }: Props)
   const [earnedPoints, setEarnedPoints] = useState<number>(POINTS.SUBMIT)
 
   // İlk yükleme: ürün + bekleyen bildirimler + ürün önbelleği
-  useState(() => {
+  useEffect(() => {
+    let cancelled = false
     const init = async () => {
+      setStep('loading')
       try {
         const [found, pending, allProducts] = await Promise.all([
           getProductByBarcode(barcode),
           getPendingSubmissionsByBarcode(barcode),
           getAllProducts(),
         ])
+        if (cancelled) return
         allProductsRef.current = allProducts
         if (found) {
           setProduct(found)
           setProductName(found.name)
         }
-        // market → en son pending submission map'i
         const byMarket: Record<string, PriceSubmission> = {}
         for (const sub of pending) {
-          // Kendi bildirimimiz varsa gösterme
           if (user && sub.submittedBy === user.uid) continue
           if (!byMarket[sub.market]) byMarket[sub.market] = sub
         }
         setPendingByMarket(byMarket)
       } catch { /* ignore */ }
-      setStep('product')
+      if (!cancelled) setStep('product')
     }
     init()
-  })
+    return () => { cancelled = true }
+  }, [barcode, user])
 
   // Market seçimi değişince ilgili pending'i güncelle
   useEffect(() => {

@@ -171,7 +171,8 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
         const text = decodeCanvas(reader, canvas)
         if (text) {
           stopCamera()
-          finish(text)
+          // Sadece rakamlar — boşluk/çizgi olmasın
+          finish(text.replace(/\D/g, '') || text)
         }
       }, 280)
     } catch (err: unknown) {

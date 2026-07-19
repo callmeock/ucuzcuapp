@@ -10,18 +10,27 @@ const SUB_COL  = 'price_submissions'
 const PROD_COL = 'products'
 const USER_COL = 'users'
 
-/** UPC-E ↔ UPC-A gibi yaygın varyantlar */
-function barcodeVariants(raw: string): string[] {
-  const c = String(raw || '').replace(/\D/g, '')
+/** Barkodu sadece rakamlara indir + yaygın hane varyantları üret */
+export function normalizeBarcode(raw: string): string {
+  return String(raw || '').replace(/\D/g, '')
+}
+
+/**
+ * Telefonlar aynı barkodu 8 / 11 / 12 / 13 hane olarak döndürebilir.
+ * UPC-E (8) ↔ UPC-A (12) ↔ EAN-13 (13, başa 0)
+ */
+export function barcodeVariants(raw: string): string[] {
+  const c = normalizeBarcode(raw)
   const out = new Set<string>()
   if (!c) return []
   out.add(c)
-  out.add(raw.trim())
 
-  // UPC-E (8 hane) → UPC-A (12 hane)
+  const add = (s: string) => { if (s) out.add(s) }
+
+  // UPC-E (8 hane, 0/1 ile başlar) → UPC-A (12)
   if (c.length === 8 && (c[0] === '0' || c[0] === '1')) {
     const ns = c[0]
-    const d = c.slice(1, 7) // ABCDEF
+    const d = c.slice(1, 7)
     const chk = c[7]
     const F = d[5]
     let mfr = ''
@@ -39,12 +48,32 @@ function barcodeVariants(raw: string): string[] {
       mfr = d.slice(0, 5)
       item = '0000' + F
     }
-    out.add(ns + mfr + item + chk)
+    const upcA = ns + mfr + item + chk
+    add(upcA)
+    add('0' + upcA) // EAN-13
   }
 
-  // 12 haneli UPC-A başında 0 yoksa bazen 13 hane EAN olarak gelir
-  if (c.length === 12) out.add('0' + c)
-  if (c.length === 13 && c.startsWith('0')) out.add(c.slice(1))
+  // 12 → 13 (başa 0), 13 → 12 (baştaki 0 sil)
+  if (c.length === 12) add('0' + c)
+  if (c.length === 13 && c.startsWith('0')) add(c.slice(1))
+
+  // 11 hane: baştaki 0 düşmüş UPC-A
+  if (c.length === 11) {
+    add('0' + c)
+    add('00' + c)
+  }
+
+  // 14 hane GTIN: soldan 0 kırp
+  if (c.length === 14 && c.startsWith('0')) {
+    add(c.slice(1))
+    add(c.replace(/^0+/, '') || c)
+  }
+
+  // Kısa kodları 12/13'e pad (nadiren)
+  if (c.length >= 6 && c.length < 12) {
+    add(c.padStart(12, '0'))
+    add(c.padStart(13, '0'))
+  }
 
   return [...out]
 }
@@ -59,7 +88,6 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
       return { id: snap.docs[0].id, ...snap.docs[0].data() } as Product
     }
   }
-  // barcodes[] dizisinde ara (alternatif formatlar)
   for (const v of variants) {
     const q = query(collection(db, PROD_COL), where('barcodes', 'array-contains', v))
     const snap = await getDocs(q)
