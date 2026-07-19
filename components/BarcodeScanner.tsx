@@ -20,21 +20,57 @@ const FORMATS = [
   Html5QrcodeSupportedFormats.CODE_39,
 ]
 
-async function pickBackCameraId(): Promise<string | { facingMode: object } | { facingMode: string }> {
-  try {
-    const cameras = await Html5Qrcode.getCameras()
-    if (cameras.length) {
-      const back = cameras.find((c) =>
-        /back|rear|environment|arka|world/i.test(c.label)
-      )
-      // Çoklu kamerada genelde sonuncu arka kameradır (iPhone)
-      if (back) return back.id
-      if (cameras.length > 1) return cameras[cameras.length - 1].id
-      return cameras[0].id
-    }
-  } catch { /* getCameras izin ister; devam */ }
+const SCAN_CONFIG = {
+  fps: 12,
+  qrbox: (w: number, h: number) => ({
+    width: Math.floor(Math.min(w * 0.88, 340)),
+    height: Math.floor(Math.min(h * 0.28, 130)),
+  }),
+  aspectRatio: 1.777778,
+  disableFlip: false,
+  // videoConstraints VERME — html5-qrcode onu verirsen start()'taki
+  // facingMode/deviceId'yi tamamen yok sayıyor ve ön kameraya düşebiliyor.
+}
 
-  return { facingMode: { ideal: 'environment' } }
+/** Arka kamera deviceId — önce exact environment ile zorla */
+async function resolveBackCamera(): Promise<string | MediaTrackConstraints> {
+  // 1) Tarayıcıya doğrudan arka kamerayı iste
+  const tryConstraints: MediaTrackConstraints[] = [
+    { facingMode: { exact: 'environment' } },
+    { facingMode: 'environment' },
+  ]
+
+  for (const video of tryConstraints) {
+    let stream: MediaStream | null = null
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video })
+      const track = stream.getVideoTracks()[0]
+      const settings = track.getSettings()
+      const deviceId = settings.deviceId
+      const facing = settings.facingMode
+      stream.getTracks().forEach((t) => t.stop())
+      stream = null
+
+      // Gerçekten arka mı?
+      if (facing === 'environment' && deviceId) return deviceId
+      if (deviceId && facing !== 'user') return deviceId
+    } catch {
+      if (stream) stream.getTracks().forEach((t) => t.stop())
+    }
+  }
+
+  // 2) Etiketlere bak (izin sonrası label dolar)
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const videos = devices.filter((d) => d.kind === 'videoinput')
+    const back = videos.find((d) => /back|rear|environment|arka|world/i.test(d.label))
+    if (back?.deviceId) return back.deviceId
+    const notFront = videos.find((d) => d.label && !/front|user|ön|face|selfie/i.test(d.label))
+    if (notFront?.deviceId && videos.length > 1) return notFront.deviceId
+  } catch { /* ignore */ }
+
+  // 3) Son çare: exact facingMode constraint (deviceId yok)
+  return { facingMode: { exact: 'environment' } }
 }
 
 export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerProps) {
@@ -82,35 +118,40 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       })
       scannerRef.current = scanner
 
-      const cameraConfig = await pickBackCameraId()
+      const camera = await resolveBackCamera()
       if (cancelled) return
 
-      try {
+      const startWith = async (cam: string | MediaTrackConstraints) => {
         await scanner.start(
-          cameraConfig,
-          {
-            fps: 12,
-            qrbox: (w, h) => ({
-              width: Math.floor(Math.min(w * 0.88, 340)),
-              height: Math.floor(Math.min(h * 0.28, 130)),
-            }),
-            aspectRatio: 1.777778,
-            disableFlip: false,
-            videoConstraints: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-            },
-          },
+          cam,
+          SCAN_CONFIG,
           (text) => { void finish(text) },
           () => { /* frame miss */ },
         )
+      }
 
+      try {
+        await startWith(camera)
         if (cancelled) {
           await stop()
           return
         }
 
+        // Açılan kamera ön mü kontrol et — ise kapatıp arka kamerayı zorla
+        let facing = ''
+        try {
+          facing = scanner.getRunningTrackSettings()?.facingMode || ''
+        } catch { /* ignore */ }
+
+        if (facing === 'user') {
+          try { await scanner.stop() } catch { /* ignore */ }
+          await startWith({ facingMode: { exact: 'environment' } })
+        }
+
+        if (cancelled) {
+          await stop()
+          return
+        }
         setStatus('ready')
         try {
           const caps = scanner.getRunningTrackCameraCapabilities()
@@ -119,22 +160,32 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
           setHasTorch(false)
         }
       } catch (err: unknown) {
-        // exact environment fail → ideal dene
-        try {
-          await scanner.start(
-            { facingMode: 'environment' },
-            {
-              fps: 10,
-              qrbox: { width: 280, height: 120 },
-            },
-            (text) => { void finish(text) },
-            () => {},
-          )
-          if (!cancelled) setStatus('ready')
-        } catch (err2: unknown) {
-          const e = err2 as { message?: string }
-          if (!cancelled) {
-            setErrorMsg(e.message || 'Kamera açılamadı')
+        // Fallback zinciri
+        const fallbacks: MediaTrackConstraints[] = [
+          { facingMode: { exact: 'environment' } },
+          { facingMode: 'environment' },
+        ]
+        let started = false
+        for (const fb of fallbacks) {
+          try {
+            if (scanner.isScanning) {
+              try { await scanner.stop() } catch { /* ignore */ }
+            }
+            await startWith(fb)
+            started = true
+            break
+          } catch { /* next */ }
+        }
+        if (!cancelled) {
+          if (started) {
+            setStatus('ready')
+            try {
+              const caps = scanner.getRunningTrackCameraCapabilities()
+              setHasTorch(!!caps?.torchFeature?.()?.isSupported?.())
+            } catch { setHasTorch(false) }
+          } else {
+            const e = err as { message?: string }
+            setErrorMsg(e.message || 'Arka kamera açılamadı')
             setStatus('error')
           }
         }
