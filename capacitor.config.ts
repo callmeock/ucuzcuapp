@@ -16,6 +16,8 @@ const config: CapacitorConfig = {
       '*.googleapis.com',
       '*.firebaseapp.com',
       '*.firebase.com',
+      'appleid.apple.com',
+      '*.apple.com',
       'nominatim.openstreetmap.org',
     ],
   },

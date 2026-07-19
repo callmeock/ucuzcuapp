@@ -7,18 +7,25 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
+  OAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
   signOut as firebaseSignOut,
   User,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
-import { addGuestPoints, getGuestPoints, clearGuestPoints } from './points'
+import { getGuestPoints, clearGuestPoints } from './points'
 import { needsRedirectAuth } from './capacitor'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithApple: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -26,8 +33,18 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signInWithGoogle: async () => {},
+  signInWithApple: async () => {},
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => {},
   signOut: async () => {},
 })
+
+function appleProvider() {
+  const provider = new OAuthProvider('apple.com')
+  provider.addScope('email')
+  provider.addScope('name')
+  return provider
+}
 
 async function syncUserProfile(u: User) {
   const ref = doc(db, 'users', u.uid)
@@ -56,12 +73,45 @@ async function syncUserProfile(u: User) {
   if (guestPoints > 0) clearGuestPoints()
 }
 
+async function oauthSignIn(provider: GoogleAuthProvider | OAuthProvider) {
+  if (needsRedirectAuth()) {
+    await signInWithRedirect(auth, provider)
+    return
+  }
+  const result = await signInWithPopup(auth, provider)
+  await syncUserProfile(result.user)
+}
+
+export function mapAuthError(err: unknown): string {
+  const code = (err as { code?: string })?.code || ''
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'Bu e-posta zaten kayıtlı. Giriş yapmayı dene.'
+    case 'auth/invalid-email':
+      return 'Geçersiz e-posta adresi.'
+    case 'auth/weak-password':
+      return 'Şifre en az 6 karakter olmalı.'
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'E-posta veya şifre hatalı.'
+    case 'auth/too-many-requests':
+      return 'Çok fazla deneme. Biraz sonra tekrar dene.'
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Giriş iptal edildi.'
+    case 'auth/operation-not-allowed':
+      return 'Bu giriş yöntemi henüz aktif değil.'
+    default:
+      return (err as { message?: string })?.message || 'Giriş başarısız. Tekrar dene.'
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // OAuth redirect dönüşü (Capacitor / iOS Safari)
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) await syncUserProfile(result.user)
@@ -76,12 +126,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider()
-    if (needsRedirectAuth()) {
-      await signInWithRedirect(auth, provider)
-      return
+    await oauthSignIn(new GoogleAuthProvider())
+  }
+
+  const signInWithApple = async () => {
+    await oauthSignIn(appleProvider())
+  }
+
+  const signInWithEmail = async (email: string, password: string) => {
+    const result = await signInWithEmailAndPassword(auth, email.trim(), password)
+    await syncUserProfile(result.user)
+  }
+
+  const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
+    const result = await createUserWithEmailAndPassword(auth, email.trim(), password)
+    if (displayName?.trim()) {
+      await updateProfile(result.user, { displayName: displayName.trim() })
     }
-    const result = await signInWithPopup(auth, provider)
     await syncUserProfile(result.user)
   }
 
@@ -90,7 +151,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signInWithGoogle,
+        signInWithApple,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

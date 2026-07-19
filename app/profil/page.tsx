@@ -192,7 +192,7 @@ export default function ProfilPage() {
                 href="/giris"
                 className="inline-block mt-2 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors"
               >
-                Google ile Giriş Yap →
+                Giriş Yap →
               </Link>
             </div>
           </div>

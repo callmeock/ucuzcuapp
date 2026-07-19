@@ -4,7 +4,7 @@ import { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import BottomTabBar from './BottomTabBar'
 
-const HIDE_TAB_PATHS = ['/admin', '/giris', '/gizlilik', '/dogrula']
+const HIDE_TAB_PATHS = ['/admin', '/giris', '/gizlilik', '/dogrula', '/destek']
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()

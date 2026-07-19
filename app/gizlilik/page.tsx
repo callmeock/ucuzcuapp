@@ -29,7 +29,7 @@ export default function GizlilikPage() {
           <section>
             <h2 className="text-lg font-bold text-gray-900">2. Toplanan Veriler</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Hesap bilgileri:</strong> Google ile giriş yaptığınızda ad, e-posta ve profil fotoğrafı</li>
+              <li><strong>Hesap bilgileri:</strong> Apple, Google veya e-posta ile giriş yaptığınızda ad ve e-posta (Apple&apos;da Hide My Email kullanırsanız yalnızca özel relay adresi)</li>
               <li><strong>Konum:</strong> İzin verirseniz yaklaşık ilçe/şehir bilgisi (koordinatlar cihazda saklanır)</li>
               <li><strong>Kamera:</strong> Barkod tarama için yalnızca cihazınızda işlenir, görüntü sunucuya gönderilmez</li>
               <li><strong>Katkılar:</strong> Bildirdiğiniz fiyatlar ve doğrulama oyları</li>
@@ -58,7 +58,8 @@ export default function GizlilikPage() {
             <p>
               Hesabınızı silmek veya verilerinize erişmek için{' '}
               <a href="mailto:eonurcankilic@gmail.com" className="text-primary">eonurcankilic@gmail.com</a>{' '}
-              adresine yazabilirsiniz.
+              adresine yazabilir veya{' '}
+              <Link href="/destek" className="text-primary">Destek</Link> sayfasını ziyaret edebilirsiniz.
             </p>
           </section>
 

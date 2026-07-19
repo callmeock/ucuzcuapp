@@ -140,7 +140,7 @@ export default function TaraPage() {
                 href="/giris"
                 className="mt-2 block text-center text-xs font-bold text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg py-2 transition-colors"
               >
-                Google ile Giriş Yap →
+                Giriş Yap →
               </Link>
             </div>
           </div>
