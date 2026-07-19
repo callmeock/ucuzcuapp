@@ -81,15 +81,33 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
   const startZxing = useCallback(async () => {
     setUseZxing(true)
     try {
-      const { BrowserMultiFormatReader } = await import('@zxing/library')
-      const reader = new BrowserMultiFormatReader()
+      const { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } = await import('@zxing/library')
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.QR_CODE,
+      ])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+      const reader = new BrowserMultiFormatReader(hints)
       zxingRef.current = reader
 
       setStatus('scanning')
 
       // decodeFromConstraints: ZXing kendi stream yönetimini yapıyor (iOS uyumlu)
       await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+        {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            focusMode: { ideal: 'continuous' },
+          } as MediaTrackConstraints,
+        },
         videoRef.current!,
         (result, _err) => {
           if (result) {
@@ -211,7 +229,7 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
       <div className="bg-gray-900 px-4 py-4 safe-bottom">
         {status === 'scanning' && (
           <p className="text-gray-400 text-xs text-center mb-3">
-            Barkodu çerçeve içine getir
+            Barkodu yatay tut, çerçeveye büyük getir. Ekrandan tarıyorsan parlaklığı aç.
           </p>
         )}
         <form onSubmit={handleManualSubmit} className="flex gap-2">
