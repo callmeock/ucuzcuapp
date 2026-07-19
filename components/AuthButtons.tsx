@@ -4,7 +4,7 @@ import { useState, FormEvent } from 'react'
 import { useAuth, mapAuthError } from '@/lib/auth'
 
 type Mode = 'signin' | 'signup'
-type Busy = 'apple' | 'google' | 'email' | null
+type Busy = 'apple' | 'google' | 'email' | 'reset' | null
 
 interface AuthButtonsProps {
   onSuccess?: () => void
@@ -12,10 +12,11 @@ interface AuthButtonsProps {
 }
 
 export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
-  const { signInWithApple, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth()
+  const { signInWithApple, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useAuth()
   const [busy, setBusy] = useState<Busy>(null)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<Mode>('signin')
+  const [info, setInfo] = useState('')
+  const [mode, setMode] = useState<Mode>('signup')
   const [showEmail, setShowEmail] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,6 +25,7 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
   const run = async (key: Busy, fn: () => Promise<void>) => {
     setBusy(key)
     setError('')
+    setInfo('')
     try {
       await fn()
       onSuccess?.()
@@ -40,7 +42,7 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
       setError('E-posta ve şifre gerekli.')
       return
     }
-    if (mode === 'signup' && password.length < 6) {
+    if (password.length < 6) {
       setError('Şifre en az 6 karakter olmalı.')
       return
     }
@@ -51,6 +53,24 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
         await signInWithEmail(email, password)
       }
     })
+  }
+
+  const handleReset = async () => {
+    if (!email.trim()) {
+      setError('Şifre sıfırlamak için önce e-posta yaz.')
+      return
+    }
+    setBusy('reset')
+    setError('')
+    setInfo('')
+    try {
+      await resetPassword(email)
+      setInfo('Şifre sıfırlama linki e-postana gönderildi.')
+    } catch (err) {
+      setError(mapAuthError(err))
+    } finally {
+      setBusy(null)
+    }
   }
 
   const btnBase =
@@ -119,21 +139,21 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
               <div className="flex gap-2 text-sm font-semibold">
                 <button
                   type="button"
-                  onClick={() => { setMode('signin'); setError('') }}
-                  className={`flex-1 py-2 rounded-xl transition-colors ${
-                    mode === 'signin' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  Giriş Yap
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMode('signup'); setError('') }}
+                  onClick={() => { setMode('signup'); setError(''); setInfo('') }}
                   className={`flex-1 py-2 rounded-xl transition-colors ${
                     mode === 'signup' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
                   }`}
                 >
                   Kayıt Ol
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('signin'); setError(''); setInfo('') }}
+                  className={`flex-1 py-2 rounded-xl transition-colors ${
+                    mode === 'signin' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  Giriş Yap
                 </button>
               </div>
 
@@ -182,6 +202,17 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
                   'Giriş Yap'
                 )}
               </button>
+
+              {mode === 'signin' && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={!!busy}
+                  className="w-full text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2 py-1"
+                >
+                  {busy === 'reset' ? 'Gönderiliyor...' : 'Şifremi unuttum'}
+                </button>
+              )}
             </form>
           )}
         </>
@@ -189,6 +220,9 @@ export default function AuthButtons({ onSuccess, compact }: AuthButtonsProps) {
 
       {error && (
         <p className="text-center text-xs text-red-500">{error}</p>
+      )}
+      {info && (
+        <p className="text-center text-xs text-green-600">{info}</p>
       )}
     </div>
   )
