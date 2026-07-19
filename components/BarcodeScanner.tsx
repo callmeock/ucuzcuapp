@@ -186,14 +186,13 @@ export default function BarcodeScanner({ onDetected, onClose }: BarcodeScannerPr
   }, [finish, stopCamera])
 
   const startNative = useCallback(async () => {
-    // @ts-expect-error BarcodeDetector
-    if (typeof window.BarcodeDetector !== 'function') return false
+    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector
+    if (typeof BD !== 'function') return false
     if (isIOS()) return false
 
     let detector: { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> }
     try {
-      // @ts-expect-error BarcodeDetector
-      detector = new window.BarcodeDetector({
+      detector = new BD({
         formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'],
       })
     } catch {
