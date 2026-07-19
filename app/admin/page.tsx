@@ -6,8 +6,7 @@ import { Product, CATEGORIES, SUBCATEGORIES, MARKET_COLORS, CATEGORY_CONFIG, typ
 import { uploadBrosur, getAllBrosurler, deleteBrosur, type Brosur } from '@/lib/brosurler'
 import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
-
-const ADMIN_EMAIL = 'eonurcankilic@gmail.com'
+import AuthButtons from '@/components/AuthButtons'
 
 type MarketName = 'Migros' | 'A101' | 'BİM' | 'Şok'
 const MARKETS: MarketName[] = ['Migros', 'A101', 'BİM', 'Şok']
@@ -24,7 +23,7 @@ const emptyCampaignCashback: Record<MarketName, string> = { Migros: '', A101: ''
 const emptyCampaignCashbackUnit: Record<MarketName, string> = { Migros: '₺', A101: '₺', 'BİM': '₺', 'Şok': 'Win Para' }
 
 export default function AdminPage() {
-  const { user, loading: authLoading, signInWithGoogle } = useAuth()
+  const { user, loading: authLoading, isAdmin } = useAuth()
 
   if (authLoading) {
     return (
@@ -34,28 +33,23 @@ export default function AdminPage() {
     )
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-sm w-full text-center">
-          <div className="text-5xl mb-4">🔒</div>
-          <h1 className="font-bold text-gray-900 text-xl mb-2">Yetkisiz Erişim</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            Bu sayfaya erişmek için admin hesabıyla giriş yapman gerekiyor.
+        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-sm w-full text-center space-y-4">
+          <div className="text-5xl">🔒</div>
+          <h1 className="font-bold text-gray-900 text-xl">Yetkisiz Erişim</h1>
+          <p className="text-gray-500 text-sm">
+            Admin paneli için <span className="font-semibold text-gray-700">eonurcankilic@gmail.com</span> ile giriş yap.
           </p>
           {!user ? (
-            <button
-              onClick={signInWithGoogle}
-              className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-colors"
-            >
-              Google ile Giriş Yap
-            </button>
+            <AuthButtons />
           ) : (
             <p className="text-sm text-red-500 font-semibold">
               {user.email} bu panele erişemez.
             </p>
           )}
-          <Link href="/" className="block mt-4 text-sm text-gray-400 hover:text-gray-600">
+          <Link href="/" className="block text-sm text-gray-400 hover:text-gray-600">
             ← Ana sayfaya dön
           </Link>
         </div>

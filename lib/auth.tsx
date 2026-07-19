@@ -8,50 +8,65 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
+  EmailAuthProvider,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   fetchSignInMethodsForEmail,
+  linkWithPopup,
+  linkWithRedirect,
+  linkWithCredential,
   updateProfile,
   signOut as firebaseSignOut,
   User,
+  AuthCredential,
+  OAuthCredential,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { getGuestPoints, clearGuestPoints } from './points'
 import { needsRedirectAuth } from './capacitor'
 
+/** Tek admin hesabı — Google veya e-posta ile aynı adres */
+export const ADMIN_EMAIL = 'eonurcankilic@gmail.com'
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  return (email || '').trim().toLowerCase() === ADMIN_EMAIL
+}
+
+export function hasProvider(user: User | null | undefined, providerId: string): boolean {
+  return !!user?.providerData.some((p) => p.providerId === providerId)
+}
+
 interface AuthContextType {
   user: User | null
   loading: boolean
+  isAdmin: boolean
   signInWithGoogle: () => Promise<void>
   signInWithApple: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  linkGoogle: () => Promise<void>
+  linkEmailPassword: (password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isAdmin: false,
   signInWithGoogle: async () => {},
   signInWithApple: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
   resetPassword: async () => {},
+  linkGoogle: async () => {},
+  linkEmailPassword: async () => {},
   signOut: async () => {},
 })
 
-function providerHint(methods: string[]): string | null {
-  const hasPassword = methods.includes('password')
-  const oauth = methods.filter((m) => m === 'google.com' || m === 'apple.com')
-  if (!hasPassword && oauth.length > 0) {
-    const labels = oauth.map((m) => (m === 'google.com' ? 'Google' : 'Apple')).join(' / ')
-    return `Bu e-posta ${labels} ile kayıtlı. Lütfen o yöntemle giriş yap.`
-  }
-  return null
-}
+const PENDING_GOOGLE_KEY = 'ucuzcu_pending_google_cred'
 
 function appleProvider() {
   const provider = new OAuthProvider('apple.com')
@@ -81,30 +96,55 @@ async function syncUserProfile(u: User) {
     await setDoc(ref, {
       ...existing,
       points: (existing.points || 0) + guestPoints,
+      email: u.email || existing.email,
+      displayName: u.displayName || existing.displayName,
+      photoURL: u.photoURL || existing.photoURL,
+    }, { merge: true })
+  } else {
+    await setDoc(ref, {
+      email: u.email,
+      displayName: u.displayName,
+      photoURL: u.photoURL,
     }, { merge: true })
   }
 
   if (guestPoints > 0) clearGuestPoints()
 }
 
-async function oauthSignIn(provider: GoogleAuthProvider | OAuthProvider) {
-  if (needsRedirectAuth()) {
-    await signInWithRedirect(auth, provider)
-    return
-  }
-  const result = await signInWithPopup(auth, provider)
-  await syncUserProfile(result.user)
+function savePendingGoogleCred(cred: AuthCredential) {
+  try {
+    const oauth = cred as OAuthCredential
+    sessionStorage.setItem(PENDING_GOOGLE_KEY, JSON.stringify({
+      idToken: oauth.idToken ?? null,
+      accessToken: oauth.accessToken ?? null,
+    }))
+  } catch { /* ignore */ }
+}
+
+function loadPendingGoogleCred(): AuthCredential | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_GOOGLE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as { idToken?: string | null; accessToken?: string | null }
+    if (data.idToken || data.accessToken) {
+      return GoogleAuthProvider.credential(data.idToken ?? undefined, data.accessToken ?? undefined)
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+function clearPendingGoogleCred() {
+  try { sessionStorage.removeItem(PENDING_GOOGLE_KEY) } catch { /* ignore */ }
 }
 
 export function mapAuthError(err: unknown): string {
   const msg = (err as { message?: string })?.message || ''
-  // Bizim özel Türkçe mesajlarımız Firebase prefix'i taşımaz
   if (msg && !msg.startsWith('Firebase:') && !msg.startsWith('auth/')) return msg
 
   const code = (err as { code?: string })?.code || ''
   switch (code) {
     case 'auth/email-already-in-use':
-      return 'Bu e-posta zaten kayıtlı. Giriş Yap sekmesini dene veya Google / Apple kullan.'
+      return 'Bu e-posta zaten kayıtlı. Giriş Yap veya Google / Apple ile devam et.'
     case 'auth/invalid-email':
       return 'Geçersiz e-posta adresi.'
     case 'auth/weak-password':
@@ -113,26 +153,39 @@ export function mapAuthError(err: unknown): string {
       return 'Bu e-posta ile hesap bulunamadı. Önce Kayıt Ol.'
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'E-posta veya şifre hatalı. Hesabın yoksa Kayıt Ol sekmesini kullan.'
+      return 'E-posta veya şifre hatalı. Hesabın yoksa Kayıt Ol; Google ile kayıtlıysa Google kullan.'
     case 'auth/too-many-requests':
       return 'Çok fazla deneme. Biraz sonra tekrar dene.'
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Giriş iptal edildi.'
     case 'auth/operation-not-allowed':
-      return 'E-posta ile giriş Firebase’de henüz açık değil.'
+      return 'Bu giriş yöntemi henüz aktif değil.'
     case 'auth/missing-email':
       return 'Önce e-posta adresini yaz.'
-    case 'auth/oauth-only':
-      return (err as { message?: string })?.message || 'Bu e-posta Google veya Apple ile kayıtlı.'
+    case 'auth/credential-already-in-use':
+      return 'Bu Google hesabı başka bir kullanıcıya bağlı.'
+    case 'auth/provider-already-linked':
+      return 'Bu giriş yöntemi zaten bağlı.'
+    case 'auth/requires-recent-login':
+      return 'Güvenlik için tekrar giriş yap, sonra bağla.'
+    case 'auth/account-exists-with-different-credential':
+      return 'Bu e-posta başka bir yöntemle kayıtlı. E-posta/şifre ile giriş yap; Google otomatik bağlanır.'
     default:
-      return (err as { message?: string })?.message || 'Giriş başarısız. Tekrar dene.'
+      return msg || 'Giriş başarısız. Tekrar dene.'
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload()
+      setUser(auth.currentUser)
+    }
+  }
 
   useEffect(() => {
     getRedirectResult(auth)
@@ -148,6 +201,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsub
   }, [])
 
+  const oauthSignIn = async (provider: GoogleAuthProvider | OAuthProvider) => {
+    try {
+      if (needsRedirectAuth()) {
+        await signInWithRedirect(auth, provider)
+        return
+      }
+      const result = await signInWithPopup(auth, provider)
+      await syncUserProfile(result.user)
+    } catch (err) {
+      const code = (err as { code?: string })?.code
+      // E-posta/şifre hesabı varken Google denenince: credential sakla, şifre ile giriş sonrası bağla
+      if (code === 'auth/account-exists-with-different-credential' && provider instanceof GoogleAuthProvider) {
+        const cred = GoogleAuthProvider.credentialFromError(err as Parameters<typeof GoogleAuthProvider.credentialFromError>[0])
+        const email = (err as { customData?: { email?: string } })?.customData?.email
+        if (cred) savePendingGoogleCred(cred)
+        throw Object.assign(
+          new Error(
+            email
+              ? `${email} e-posta/şifre ile kayıtlı. Şifrenle giriş yap — Google hesabın otomatik bağlanır.`
+              : 'Bu e-posta şifre ile kayıtlı. E-posta ile giriş yap; Google otomatik bağlanır.'
+          ),
+          { code }
+        )
+      }
+      throw err
+    }
+  }
+
+  const maybeLinkPendingGoogle = async (u: User) => {
+    const pending = loadPendingGoogleCred()
+    if (!pending) return
+    try {
+      await linkWithCredential(u, pending)
+      clearPendingGoogleCred()
+      await refreshUser()
+    } catch (err) {
+      const code = (err as { code?: string })?.code
+      if (code === 'auth/provider-already-linked') clearPendingGoogleCred()
+      // diğer hatalarda pending kalsın; kullanıcı tekrar deneyebilir
+    }
+  }
+
   const signInWithGoogle = async () => {
     await oauthSignIn(new GoogleAuthProvider())
   }
@@ -161,24 +256,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await signInWithEmailAndPassword(auth, cleaned, password)
       await syncUserProfile(result.user)
+      await maybeLinkPendingGoogle(result.user)
     } catch (err) {
       const code = (err as { code?: string })?.code
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         try {
           const methods = await fetchSignInMethodsForEmail(auth, cleaned)
-          const hint = providerHint(methods)
-          if (hint) throw Object.assign(new Error(hint), { code: 'auth/oauth-only', message: hint })
+          if (methods.includes('google.com') && !methods.includes('password')) {
+            throw Object.assign(
+              new Error('Bu e-posta Google ile kayıtlı. Google ile giriş yap, sonra Profil’den şifre ekleyebilirsin.'),
+              { code: 'auth/oauth-only' }
+            )
+          }
+          if (methods.includes('apple.com') && !methods.includes('password')) {
+            throw Object.assign(
+              new Error('Bu e-posta Apple ile kayıtlı. Apple ile giriş yap, sonra Profil’den şifre ekleyebilirsin.'),
+              { code: 'auth/oauth-only' }
+            )
+          }
           if (methods.length === 0) {
-            throw Object.assign(new Error('Bu e-posta ile hesap yok. Kayıt Ol sekmesinden üye ol.'), {
-              code: 'auth/user-not-found',
-              message: 'Bu e-posta ile hesap yok. Kayıt Ol sekmesinden üye ol.',
-            })
+            throw Object.assign(
+              new Error('Bu e-posta ile hesap yok. Kayıt Ol sekmesinden üye ol.'),
+              { code: 'auth/user-not-found' }
+            )
           }
         } catch (inner) {
           if ((inner as { code?: string })?.code === 'auth/oauth-only' || (inner as { code?: string })?.code === 'auth/user-not-found') {
             throw inner
           }
-          // enumeration protection: methods boş dönebilir — orijinal hatayı kullan
         }
       }
       throw err
@@ -193,14 +298,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await updateProfile(result.user, { displayName: displayName.trim() })
       }
       await syncUserProfile(result.user)
+      await maybeLinkPendingGoogle(result.user)
     } catch (err) {
       if ((err as { code?: string })?.code === 'auth/email-already-in-use') {
         try {
           const methods = await fetchSignInMethodsForEmail(auth, cleaned)
-          const hint = providerHint(methods)
-          if (hint) throw Object.assign(new Error(hint), { code: 'auth/oauth-only', message: hint })
+          if (methods.includes('google.com')) {
+            throw Object.assign(
+              new Error('Bu e-posta Google ile kayıtlı. Google ile giriş yap, sonra Profil’den şifre ekle — ikisi de çalışır.'),
+              { code: 'auth/oauth-only' }
+            )
+          }
+          if (methods.includes('apple.com')) {
+            throw Object.assign(
+              new Error('Bu e-posta Apple ile kayıtlı. Apple ile giriş yap, sonra Profil’den şifre ekle.'),
+              { code: 'auth/oauth-only' }
+            )
+          }
+          if (methods.includes('password')) {
+            throw Object.assign(
+              new Error('Bu e-posta zaten kayıtlı. Giriş Yap sekmesini kullan.'),
+              { code: 'auth/email-already-in-use' }
+            )
+          }
         } catch (inner) {
-          if ((inner as { code?: string })?.code === 'auth/oauth-only') throw inner
+          if ((inner as { code?: string })?.code) throw inner
         }
       }
       throw err
@@ -215,7 +337,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, cleaned)
   }
 
+  /** Oturum açıkken Google hesabını bağla */
+  const linkGoogle = async () => {
+    const u = auth.currentUser
+    if (!u) throw Object.assign(new Error('Önce giriş yap.'), { code: 'auth/requires-recent-login' })
+    if (hasProvider(u, 'google.com')) {
+      throw Object.assign(new Error('Google zaten bağlı.'), { code: 'auth/provider-already-linked' })
+    }
+    const provider = new GoogleAuthProvider()
+    if (needsRedirectAuth()) {
+      await linkWithRedirect(u, provider)
+      return
+    }
+    await linkWithPopup(u, provider)
+    await refreshUser()
+    if (auth.currentUser) await syncUserProfile(auth.currentUser)
+  }
+
+  /** Oturum açıkken e-posta/şifre ekle (aynı e-posta ile her iki yöntem çalışır) */
+  const linkEmailPassword = async (password: string) => {
+    const u = auth.currentUser
+    if (!u?.email) throw Object.assign(new Error('Hesapta e-posta yok.'), { code: 'auth/missing-email' })
+    if (password.length < 6) {
+      throw Object.assign(new Error('Şifre en az 6 karakter olmalı.'), { code: 'auth/weak-password' })
+    }
+    if (hasProvider(u, 'password')) {
+      throw Object.assign(new Error('Şifre zaten tanımlı. Unuttuysan giriş ekranından sıfırla.'), {
+        code: 'auth/provider-already-linked',
+      })
+    }
+    const cred = EmailAuthProvider.credential(u.email, password)
+    await linkWithCredential(u, cred)
+    await refreshUser()
+    if (auth.currentUser) await syncUserProfile(auth.currentUser)
+  }
+
   const signOut = async () => {
+    clearPendingGoogleCred()
     await firebaseSignOut(auth)
   }
 
@@ -224,11 +382,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
+        isAdmin: isAdminEmail(user?.email),
         signInWithGoogle,
         signInWithApple,
         signInWithEmail,
         signUpWithEmail,
         resetPassword,
+        linkGoogle,
+        linkEmailPassword,
         signOut,
       }}
     >

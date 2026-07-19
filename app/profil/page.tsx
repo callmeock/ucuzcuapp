@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth'
+import { useAuth, hasProvider, mapAuthError } from '@/lib/auth'
 import { getGuestPoints, getPointHistory, getLevel, type PointEvent } from '@/lib/points'
 import { POINTS } from '@/lib/types'
 import {
@@ -46,12 +46,15 @@ const MARKET_COLOR: Record<string, string> = {
 }
 
 export default function ProfilPage() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, linkGoogle, linkEmailPassword, isAdmin } = useAuth()
   const router = useRouter()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [submissions, setSubmissions] = useState<MySubmission[]>([])
   const [fetching, setFetching] = useState(false)
   const [tab, setTab] = useState<'bildirimler' | 'puanlar'>('bildirimler')
+  const [newPassword, setNewPassword] = useState('')
+  const [linkBusy, setLinkBusy] = useState<'google' | 'password' | null>(null)
+  const [linkMsg, setLinkMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   // Misafir puan bilgileri
   const guestPoints = !user ? getGuestPoints() : 0
@@ -178,6 +181,100 @@ export default function ProfilPage() {
             </div>
           )}
         </div>
+
+        {/* ── Giriş yöntemleri (bağlama) ── */}
+        {user && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
+            <h2 className="font-bold text-gray-900 text-sm">Giriş yöntemleri</h2>
+            <p className="text-xs text-gray-500">
+              Google ve e-posta/şifreyi aynı hesaba bağlarsan ikisiyle de giriş yapabilirsin.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                hasProvider(user, 'google.com') ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                Google {hasProvider(user, 'google.com') ? '✓' : '—'}
+              </span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                hasProvider(user, 'password') ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                E-posta/şifre {hasProvider(user, 'password') ? '✓' : '—'}
+              </span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                hasProvider(user, 'apple.com') ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                Apple {hasProvider(user, 'apple.com') ? '✓' : '—'}
+              </span>
+              {isAdmin && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-900 text-white">
+                  Admin
+                </span>
+              )}
+            </div>
+
+            {!hasProvider(user, 'google.com') && (
+              <button
+                type="button"
+                disabled={!!linkBusy}
+                onClick={async () => {
+                  setLinkBusy('google')
+                  setLinkMsg(null)
+                  try {
+                    await linkGoogle()
+                    setLinkMsg({ type: 'ok', text: 'Google hesabı bağlandı. Artık Google ile de giriş yapabilirsin.' })
+                  } catch (err) {
+                    setLinkMsg({ type: 'err', text: mapAuthError(err) })
+                  } finally {
+                    setLinkBusy(null)
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 border-2 border-gray-200 hover:border-gray-300 rounded-xl py-3 text-sm font-semibold text-gray-700 disabled:opacity-60"
+              >
+                {linkBusy === 'google' ? 'Bağlanıyor...' : 'Google hesabını bağla'}
+              </button>
+            )}
+
+            {!hasProvider(user, 'password') && user.email && (
+              <div className="space-y-2 pt-1">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Yeni şifre (min. 6 karakter)"
+                  minLength={6}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <button
+                  type="button"
+                  disabled={!!linkBusy || newPassword.length < 6}
+                  onClick={async () => {
+                    setLinkBusy('password')
+                    setLinkMsg(null)
+                    try {
+                      await linkEmailPassword(newPassword)
+                      setNewPassword('')
+                      setLinkMsg({ type: 'ok', text: 'Şifre eklendi. Artık e-posta ile de giriş yapabilirsin.' })
+                    } catch (err) {
+                      setLinkMsg({ type: 'err', text: mapAuthError(err) })
+                    } finally {
+                      setLinkBusy(null)
+                    }
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white rounded-xl py-3 text-sm font-semibold"
+                >
+                  {linkBusy === 'password' ? 'Kaydediliyor...' : 'E-posta şifresi ekle'}
+                </button>
+              </div>
+            )}
+
+            {linkMsg && (
+              <p className={`text-xs text-center ${linkMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
+                {linkMsg.text}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Misafir uyarısı ── */}
         {!user && guestPoints > 0 && (
