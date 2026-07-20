@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
+  signInWithCredential,
   getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
@@ -22,10 +23,38 @@ import {
   AuthCredential,
   OAuthCredential,
 } from 'firebase/auth'
+import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { getGuestPoints, clearGuestPoints } from './points'
-import { needsRedirectAuth } from './capacitor'
+import { isNativeApp, needsRedirectAuth } from './capacitor'
+
+/** Native iOS bundle id — Sign in with Apple Services ID / App ID */
+const APPLE_CLIENT_ID = 'com.ock.ucuzcu'
+
+function randomNonce(length = 32): string {
+  const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._'
+  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  return Array.from(bytes, (b) => charset[b % charset.length]).join('')
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function isAppleCancelError(err: unknown): boolean {
+  const code = String((err as { code?: string | number })?.code ?? '')
+  const msg = String((err as { message?: string })?.message ?? '').toLowerCase()
+  return (
+    code === '1001' ||
+    code === 'ERR_CANCELED' ||
+    msg.includes('canceled') ||
+    msg.includes('cancelled') ||
+    msg.includes('abort')
+  )
+}
 
 /** Tek admin hesabı — Google veya e-posta ile aynı adres */
 export const ADMIN_EMAIL = 'eonurcankilic@gmail.com'
@@ -158,7 +187,10 @@ export function mapAuthError(err: unknown): string {
       return 'Çok fazla deneme. Biraz sonra tekrar dene.'
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
+    case 'auth/user-cancelled':
       return 'Giriş iptal edildi.'
+    case 'auth/missing-or-invalid-nonce':
+      return 'Apple girişi doğrulanamadı. Tekrar dene.'
     case 'auth/operation-not-allowed':
       return 'Bu giriş yöntemi henüz aktif değil.'
     case 'auth/missing-email':
@@ -247,7 +279,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await oauthSignIn(new GoogleAuthProvider())
   }
 
+  /**
+   * Native iOS: AuthenticationServices sheet via Capacitor plugin, then Firebase credential.
+   * Web/PWA: Firebase OAuth popup/redirect (WKWebView redirect often shows "no action" on iPad).
+   */
   const signInWithApple = async () => {
+    if (isNativeApp()) {
+      try {
+        const rawNonce = randomNonce()
+        const hashedNonce = await sha256Hex(rawNonce)
+        const { response } = await SignInWithApple.authorize({
+          clientId: APPLE_CLIENT_ID,
+          redirectURI: 'https://ucuzcuapp.com/',
+          scopes: 'email name',
+          nonce: hashedNonce,
+        })
+        if (!response.identityToken) {
+          throw Object.assign(new Error('Apple kimlik doğrulaması başarısız.'), {
+            code: 'auth/invalid-credential',
+          })
+        }
+        const provider = appleProvider()
+        const credential = provider.credential({
+          idToken: response.identityToken,
+          rawNonce,
+        })
+        const result = await signInWithCredential(auth, credential)
+        const fullName = [response.givenName, response.familyName].filter(Boolean).join(' ').trim()
+        if (fullName && !result.user.displayName) {
+          await updateProfile(result.user, { displayName: fullName })
+        }
+        await syncUserProfile(result.user)
+        return
+      } catch (err) {
+        if (isAppleCancelError(err)) {
+          throw Object.assign(new Error('Giriş iptal edildi.'), { code: 'auth/user-cancelled' })
+        }
+        throw err
+      }
+    }
     await oauthSignIn(appleProvider())
   }
 
