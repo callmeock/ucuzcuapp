@@ -4,13 +4,16 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@capacitor-community/apple-sign-in@7.1.0': c71ebea75b40860059a456284f5159ca32b8f39b3ddb3c937db44fcf1b860a37
+
 importers:
 
   .:
     dependencies:
       '@capacitor-community/apple-sign-in':
         specifier: ^7.1.0
-        version: 7.1.0(@capacitor/core@8.4.0)
+        version: 7.1.0(patch_hash=c71ebea75b40860059a456284f5159ca32b8f39b3ddb3c937db44fcf1b860a37)(@capacitor/core@8.4.0)
       '@capacitor/android':
         specifier: ^8.4.0
         version: 8.4.0(@capacitor/core@8.4.0)
@@ -2435,7 +2438,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@capacitor-community/apple-sign-in@7.1.0(@capacitor/core@8.4.0)':
+  '@capacitor-community/apple-sign-in@7.1.0(patch_hash=c71ebea75b40860059a456284f5159ca32b8f39b3ddb3c937db44fcf1b860a37)(@capacitor/core@8.4.0)':
     dependencies:
       '@capacitor/core': 8.4.0
       '@types/scriptjs': 0.0.2
