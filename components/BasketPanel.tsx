@@ -81,7 +81,7 @@ export default function BasketPanel({ open, onClose, basket, onUpdateQuantity }:
     <>
       {open && <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />}
 
-      <div className={`fixed top-14 right-0 bottom-0 w-96 bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-14 md:top-0 right-0 bottom-0 w-full max-w-md md:w-96 bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
 
         {/* Başlık */}
         <div className="bg-primary text-white px-4 py-3 flex justify-between items-center shrink-0">

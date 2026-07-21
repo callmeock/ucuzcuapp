@@ -35,8 +35,8 @@ export default function ProductCard({ product, basketQuantity, onClick, onAddToB
       onClick={onClick}
       className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden border border-gray-100 h-full"
     >
-      {/* ── Mobil: kompakt kart ── */}
-      <div className="flex gap-3 p-3 lg:hidden">
+      {/* ── Telefon: kompakt satır kart ── */}
+      <div className="flex gap-3 p-3 md:hidden">
         <div
           className="relative w-20 h-20 rounded-xl shrink-0 flex items-center justify-center overflow-hidden"
           style={{ background: catCfg.bg }}
@@ -84,8 +84,8 @@ export default function ProductCard({ product, basketQuantity, onClick, onAddToB
         </div>
       </div>
 
-      {/* ── Desktop: tam kart ── */}
-      <div className="hidden lg:flex lg:flex-col h-full">
+      {/* ── Tablet / masaüstü: dikey kart ── */}
+      <div className="hidden md:flex md:flex-col h-full">
         <div className="relative h-36 flex items-center justify-center" style={{ background: catCfg.bg }}>
           {product.image ? (
             <Image src={product.image} alt={product.name} fill className="object-contain p-4" sizes="33vw" />

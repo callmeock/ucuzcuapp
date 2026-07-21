@@ -31,8 +31,8 @@ export default function CategoryFilter({
 
   return (
     <>
-      {/* ── Mobil: yatay pill şeridi ── */}
-      <div className="py-2 space-y-1.5 lg:hidden">
+      {/* ── Telefon: yatay pill şeridi ── */}
+      <div className="py-2 space-y-1.5 md:hidden">
         {/* Market filtresi */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
           {['Tümü', ...MARKETS].map((m) => {
@@ -123,8 +123,8 @@ export default function CategoryFilter({
         )}
       </div>
 
-      {/* ── Masaüstü: sol sidebar ── */}
-      <nav className="hidden lg:block w-[220px] shrink-0 sticky top-4 self-start">
+      {/* ── Tablet / masaüstü: sol sidebar ── */}
+      <nav className="hidden md:block w-[200px] lg:w-[220px] shrink-0 sticky top-4 self-start">
 
         {/* Market filtresi */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-0.5 mb-3">

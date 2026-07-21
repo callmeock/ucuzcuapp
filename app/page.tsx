@@ -209,7 +209,7 @@ export default function HomePage() {
                 disabled={locationLoading}
                 className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 shrink-0"
               >
-                {locationLoading ? '...' : 'İzin Ver'}
+                {locationLoading ? '...' : 'Devam'}
               </button>
               <button onClick={handleDismissLocation} className="text-blue-300 hover:text-blue-500 text-lg shrink-0">✕</button>
             </div>
@@ -240,7 +240,7 @@ export default function HomePage() {
             <span className="text-white/70 text-sm shrink-0">→</span>
           </Link>
 
-          <div className="lg:flex lg:gap-6 lg:items-start lg:mt-2">
+          <div className="md:flex md:gap-6 md:items-start md:mt-2">
             <CategoryFilter
               activeCategory={activeCategory}
               activeSubcategory={activeSubcategory}

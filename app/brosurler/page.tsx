@@ -38,7 +38,7 @@ export default function BrosurlerPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-2xl md:max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/" className="text-gray-400 hover:text-gray-600 p-1">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
@@ -53,7 +53,7 @@ export default function BrosurlerPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-2xl md:max-w-4xl mx-auto px-4 py-5 space-y-5">
 
         {loading && (
           <div className="flex flex-col items-center py-16 gap-3">
