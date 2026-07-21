@@ -1,6 +1,2 @@
-allowBuilds:
-  protobufjs: set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
 patchedDependencies:
   '@capacitor-community/apple-sign-in@7.1.0': patches/@capacitor-community__apple-sign-in@7.1.0.patch
